@@ -16,9 +16,15 @@ OpenCode plugin to switch agent models between performance and economy modes.
 ## Features
 
 - Switch between different model presets (performance, economy, or custom)
-- Automatically applies settings to both opencode agents and oh-my-opencode agents
 - Configurable presets with user-defined models
 - Toast notifications for mode changes
+
+### Supported Agents
+
+|      Agent Type       |                                           Description                                           |
+| --------------------- | ----------------------------------------------------------------------------------------------- |
+| opencode agents       | Standard agents (`build`, `plan`, etc.)                                                         |
+| oh-my-opencode agents | Optional - applies if [oh-my-opencode](https://github.com/pekepeke/oh-my-opencode) is installed |
 
 ## Installation
 
@@ -63,6 +69,9 @@ On first run, the plugin automatically generates this file by:
 2. Setting `opencode/glm-4.7-free` for the "economy" preset
 
 ### Example Configuration
+
+> [!NOTE]
+> The `oh-my-opencode` section is optional. Omit it if you don't use oh-my-opencode.
 
 ```json
 {
