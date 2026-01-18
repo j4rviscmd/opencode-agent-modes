@@ -58,8 +58,12 @@ async function buildPerformancePreset(): Promise<ModePreset> {
     }
   }
 
+  // Extract global model from opencode.json if present
+  const globalModel = opencodeConfig?.model;
+
   return {
     description: "High-performance models for complex tasks",
+    ...(globalModel && { model: globalModel }),
     opencode: opencodePreset,
     "oh-my-opencode": ohMyOpencodePreset,
   };
@@ -96,6 +100,7 @@ async function buildEconomyPreset(): Promise<ModePreset> {
 
   return {
     description: "Cost-efficient free model for routine tasks",
+    model: DEFAULT_ECONOMY_MODEL,
     opencode: opencodePreset,
     "oh-my-opencode": ohMyOpencodePreset,
   };

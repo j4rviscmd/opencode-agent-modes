@@ -78,6 +78,10 @@ export class ModeManager {
       return `Current mode: ${currentMode} (preset not found)`;
     }
 
+    const globalModel = preset.model
+      ? `Global model: ${preset.model}`
+      : "Global model: (not set)";
+
     const opencodeAgents = Object.entries(preset.opencode)
       .map(([name, cfg]) => `  - ${name}: ${cfg.model}`)
       .join("\n");
@@ -89,6 +93,7 @@ export class ModeManager {
     return [
       `Current mode: ${currentMode}`,
       `Description: ${preset.description}`,
+      globalModel,
       "",
       "OpenCode agents:",
       opencodeAgents || "  (none configured)",
@@ -112,8 +117,11 @@ export class ModeManager {
 
     const results: string[] = [];
 
-    // 1. Update opencode.json directly (agent section only)
-    const opencodeResult = await this.updateOpencodeConfig(preset.opencode);
+    // 1. Update opencode.json (global model and agent section)
+    const opencodeResult = await this.updateOpencodeConfig(
+      preset.model,
+      preset.opencode
+    );
     results.push(`opencode.json: ${opencodeResult}`);
 
     // 2. Update oh-my-opencode.json directly (agents section only)
@@ -154,10 +162,13 @@ export class ModeManager {
   }
 
   /**
-   * Update opencode.json agent section with preset values
+   * Update opencode.json with global model and agent section
+   * @param globalModel - Global model setting (optional)
+   * @param agentPresets - Agent-specific model settings
    * @returns Result status: "updated", "skipped (not found)", or "error: ..."
    */
   private async updateOpencodeConfig(
+    globalModel: string | undefined,
     agentPresets: Record<string, { model: string }>
   ): Promise<string> {
     try {
@@ -167,13 +178,20 @@ export class ModeManager {
         return "skipped (not found)";
       }
 
-      // Update agent section only (preserve other settings)
-      opencodeConfig.agent = opencodeConfig.agent || {};
-      for (const [agentName, preset] of Object.entries(agentPresets)) {
-        opencodeConfig.agent[agentName] = {
-          ...opencodeConfig.agent[agentName],
-          model: preset.model,
-        };
+      // Update global model if specified
+      if (globalModel) {
+        opencodeConfig.model = globalModel;
+      }
+
+      // Update agent section (preserve other settings)
+      if (Object.keys(agentPresets).length > 0) {
+        opencodeConfig.agent = opencodeConfig.agent || {};
+        for (const [agentName, preset] of Object.entries(agentPresets)) {
+          opencodeConfig.agent[agentName] = {
+            ...opencodeConfig.agent[agentName],
+            model: preset.model,
+          };
+        }
       }
 
       await saveOpencodeConfig(opencodeConfig);

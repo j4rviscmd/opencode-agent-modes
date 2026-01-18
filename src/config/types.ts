@@ -10,6 +10,7 @@ export interface AgentPreset {
  */
 export interface ModePreset {
   description: string;
+  model?: string;
   opencode: Record<string, AgentPreset>;
   "oh-my-opencode": Record<string, AgentPreset>;
 }
@@ -36,6 +37,7 @@ export interface OpencodeAgentConfig {
  * OpenCode configuration file structure
  */
 export interface OpencodeConfig {
+  model?: string;
   agent?: Record<string, OpencodeAgentConfig>;
   [key: string]: unknown;
 }
