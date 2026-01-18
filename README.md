@@ -9,8 +9,9 @@
 OpenCode plugin to switch agent models between performance and economy modes.
 
 > [!NOTE]
-> **Primary Use Case**: When approaching your token limit, quickly switch to
+> **Primary Use Case**: When approaching your token limit, switch to
 > pre-defined economy models to extend your session until your quota resets.
+> Changes take effect after restarting opencode.
 
 ## Features
 
@@ -104,5 +105,5 @@ Agent-specific settings override the global model setting.
 
 ## Notes
 
-- Changes to oh-my-opencode agents require an opencode restart to take effect
+- Changes require an opencode restart to take effect
 - Custom mode presets can be added by editing the configuration file
