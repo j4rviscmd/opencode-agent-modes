@@ -112,6 +112,37 @@ agent.<name>.model > model (global)
 
 Agent-specific settings override the global model setting.
 
+## Custom Presets
+
+To add a custom preset (e.g., "premium"):
+
+1. Add the preset to `~/.config/opencode/agent-mode-switcher.json`:
+
+   ```json
+   {
+     "presets": {
+       "premium": {
+         "description": "High-end models for critical tasks",
+         "opencode": {
+           "build": { "model": "anthropic/claude-opus-4-5-20251101" }
+         }
+       }
+     }
+   }
+   ```
+
+2. Create a command file at `~/.config/opencode/command/mode-premium.md`:
+
+   ```md
+   ---
+   description: "Switch to premium mode (high-end models)"
+   ---
+
+   Use mode_switch tool to switch agent mode to "premium".
+   ```
+
+3. Restart opencode to apply changes.
+
 ## Notes
 
 - Changes require an opencode restart to take effect
