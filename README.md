@@ -2,6 +2,10 @@
 
 OpenCode plugin to switch agent models between performance and economy modes.
 
+> [!NOTE]
+> **Primary Use Case**: When approaching your token limit, quickly switch to
+> pre-defined economy models to extend your session until your quota resets.
+
 ## Features
 
 - Switch between different model presets (performance, economy, or custom)
