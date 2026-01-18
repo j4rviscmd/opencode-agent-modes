@@ -1,106 +1,69 @@
+# CLAUDE.md
 
-Default to using Bun instead of Node.js.
+This file provides guidance to Claude Code (claude.ai/code) when working with
+code in this repository.
 
-- Use `bun <file>` instead of `node <file>` or `ts-node <file>`
-- Use `bun test` instead of `jest` or `vitest`
-- Use `bun build <file.html|file.ts|file.css>` instead of `webpack` or `esbuild`
-- Use `bun install` instead of `npm install` or `yarn install` or `pnpm install`
-- Use `bun run <script>` instead of `npm run <script>` or `yarn run <script>` or `pnpm run <script>`
-- Use `bunx <package> <command>` instead of `npx <package> <command>`
-- Bun automatically loads .env, so don't use dotenv.
+## Project Overview
 
-## APIs
+OpenCode plugin for switching agent model presets between performance and
+economy modes. Modifies `opencode.json` and `oh-my-opencode.json` configuration
+files to change which AI models are used.
 
-- `Bun.serve()` supports WebSockets, HTTPS, and routes. Don't use `express`.
-- `bun:sqlite` for SQLite. Don't use `better-sqlite3`.
-- `Bun.redis` for Redis. Don't use `ioredis`.
-- `Bun.sql` for Postgres. Don't use `pg` or `postgres.js`.
-- `WebSocket` is built-in. Don't use `ws`.
-- Prefer `Bun.file` over `node:fs`'s readFile/writeFile
-- Bun.$`ls` instead of execa.
+## Commands
 
-## Testing
+```bash
+# Type checking
+bun run typecheck
 
-Use `bun test` to run tests.
+# Build
+bun run build
 
-```ts#index.test.ts
-import { test, expect } from "bun:test";
+# Lint
+bun run lint
 
-test("hello world", () => {
-  expect(1).toBe(1);
-});
+# Format
+bun run format
 ```
 
-## Frontend
+## Architecture
 
-Use HTML imports with `Bun.serve()`. Don't use `vite`. HTML imports fully support React, CSS, Tailwind.
-
-Server:
-
-```ts#index.ts
-import index from "./index.html"
-
-Bun.serve({
-  routes: {
-    "/": index,
-    "/api/users/:id": {
-      GET: (req) => {
-        return new Response(JSON.stringify({ id: req.params.id }));
-      },
-    },
-  },
-  // optional websocket support
-  websocket: {
-    open: (ws) => {
-      ws.send("Hello, world!");
-    },
-    message: (ws, message) => {
-      ws.send(message);
-    },
-    close: (ws) => {
-      // handle close
-    }
-  },
-  development: {
-    hmr: true,
-    console: true,
-  }
-})
+```text
+src/
+├── index.ts              # Plugin entry point, tool definitions
+├── config/
+│   ├── types.ts          # Type definitions and constants
+│   ├── loader.ts         # JSON file I/O utilities
+│   └── initializer.ts    # Initial config generation
+└── modes/
+    ├── index.ts          # Barrel export
+    └── manager.ts        # Mode switching logic
 ```
 
-HTML files can import .tsx, .jsx or .js files directly and Bun's bundler will transpile & bundle automatically. `<link>` tags can point to stylesheets and Bun's CSS bundler will bundle.
+### Key Components
 
-```html#index.html
-<html>
-  <body>
-    <h1>Hello, world!</h1>
-    <script type="module" src="./frontend.tsx"></script>
-  </body>
-</html>
-```
+- **Plugin Entry** (`src/index.ts`): Exports OpenCode plugin with three tools:
+  `mode_switch`, `mode_status`, `mode_list`
 
-With the following `frontend.tsx`:
+- **ModeManager** (`src/modes/manager.ts`): Core class handling mode switching.
+  Updates three config files:
+  - `~/.config/opencode/agent-mode-switcher.json` (plugin state)
+  - `~/.config/opencode/opencode.json` (opencode agents)
+  - `~/.config/opencode/oh-my-opencode.json` (oh-my-opencode agents)
 
-```tsx#frontend.tsx
-import React from "react";
-import { createRoot } from "react-dom/client";
+- **Config Initializer** (`src/config/initializer.ts`): On first run, reads
+  current models from existing configs to build "performance" preset, creates
+  "economy" preset with `opencode/glm-4.7-free`
 
-// import .css files directly and it works
-import './index.css';
+### Plugin API
 
-const root = createRoot(document.body);
+Uses `@opencode-ai/plugin` for tool definitions and `@opencode-ai/sdk` for
+client interactions (toast notifications).
 
-export default function Frontend() {
-  return <h1>Hello, world!</h1>;
-}
+## Bun Runtime
 
-root.render(<Frontend />);
-```
+Default to Bun instead of Node.js:
 
-Then, run index.ts
-
-```sh
-bun --hot ./index.ts
-```
-
-For more information, read the Bun API docs in `node_modules/bun-types/docs/**.mdx`.
+- `bun <file>` instead of `node <file>`
+- `bun test` instead of jest/vitest
+- `Bun.file()` for file I/O
+- Bun automatically loads `.env`
