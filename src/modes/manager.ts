@@ -1,15 +1,13 @@
 import type { OpencodeClient } from "@opencode-ai/sdk";
-import type {
-  ModeSwitcherConfig,
-  ModePreset,
-  OhMyOpencodeConfig,
-} from "../config/types.ts";
+import type { ModeSwitcherConfig, ModePreset } from "../config/types.ts";
 import {
   savePluginConfig,
+  loadOpencodeConfig,
+  saveOpencodeConfig,
   loadOhMyOpencodeConfig,
   saveOhMyOpencodeConfig,
 } from "../config/loader.ts";
-import { initializeConfig, validateConfig } from "../config/initializer.ts";
+import { initializeConfig } from "../config/initializer.ts";
 
 /**
  * Manages agent mode switching between different presets
@@ -112,71 +110,30 @@ export class ModeManager {
       return `Mode "${modeName}" not found. Available modes: ${available}`;
     }
 
-    // 1. Update opencode agent settings via client API
-    try {
-      const agentConfig: Record<string, { model: string }> = {};
-      for (const [agentName, agentPreset] of Object.entries(preset.opencode)) {
-        agentConfig[agentName] = { model: agentPreset.model };
-      }
+    const results: string[] = [];
 
-      await this.client.config.update({
-        body: { agent: agentConfig },
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      return `Failed to update opencode config: ${message}`;
-    }
+    // 1. Update opencode.json directly (agent section only)
+    const opencodeResult = await this.updateOpencodeConfig(preset.opencode);
+    results.push(`opencode.json: ${opencodeResult}`);
 
-    // 2. Update oh-my-opencode.json directly
-    try {
-      const ohMyConfig = await loadOhMyOpencodeConfig();
-      if (ohMyConfig) {
-        const updatedConfig: OhMyOpencodeConfig = {
-          ...ohMyConfig,
-          agents: {},
-        };
-
-        // Merge preset agents into existing config
-        if (ohMyConfig.agents) {
-          for (const agentName of Object.keys(ohMyConfig.agents)) {
-            const presetAgent = preset["oh-my-opencode"][agentName];
-            if (presetAgent) {
-              updatedConfig.agents![agentName] = { model: presetAgent.model };
-            } else {
-              // Keep existing agent if not in preset
-              updatedConfig.agents![agentName] = ohMyConfig.agents[agentName]!;
-            }
-          }
-        }
-
-        // Add any new agents from preset
-        for (const [agentName, agentPreset] of Object.entries(
-          preset["oh-my-opencode"]
-        )) {
-          if (!updatedConfig.agents![agentName]) {
-            updatedConfig.agents![agentName] = { model: agentPreset.model };
-          }
-        }
-
-        await saveOhMyOpencodeConfig(updatedConfig);
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      // Log but don't fail - oh-my-opencode might not be installed
-      console.warn(`Warning: Could not update oh-my-opencode.json: ${message}`);
-    }
+    // 2. Update oh-my-opencode.json directly (agents section only)
+    const ohMyResult = await this.updateOhMyOpencodeConfig(
+      preset["oh-my-opencode"]
+    );
+    results.push(`oh-my-opencode.json: ${ohMyResult}`);
 
     // 3. Update plugin configuration
     config.currentMode = modeName;
     this.config = config;
     await savePluginConfig(config);
+    results.push("agent-mode-switcher.json: updated");
 
     // 4. Show toast notification
     try {
       await this.client.tui.showToast({
         body: {
           title: "Mode Switched",
-          message: `Now using "${modeName}" mode. Restart opencode for oh-my-opencode changes.`,
+          message: `Switched to "${modeName}". Restart opencode to apply.`,
           variant: "warning",
           duration: 5000,
         },
@@ -189,39 +146,71 @@ export class ModeManager {
       `Switched to ${modeName} mode`,
       preset.description,
       "",
-      "Note: Restart opencode to apply oh-my-opencode changes.",
+      "Results:",
+      ...results.map((r) => `  - ${r}`),
+      "",
+      "Note: Restart opencode to apply changes.",
     ].join("\n");
   }
 
   /**
-   * Apply the current mode settings (called on startup)
+   * Update opencode.json agent section with preset values
+   * @returns Result status: "updated", "skipped (not found)", or "error: ..."
    */
-  async applyCurrentMode(): Promise<void> {
-    const config = await this.ensureConfig();
-
-    if (!validateConfig(config)) {
-      console.warn("Invalid mode switcher configuration");
-      return;
-    }
-
-    const preset = config.presets[config.currentMode];
-    if (!preset) {
-      return;
-    }
-
-    // Apply opencode agent settings
+  private async updateOpencodeConfig(
+    agentPresets: Record<string, { model: string }>
+  ): Promise<string> {
     try {
-      const agentConfig: Record<string, { model: string }> = {};
-      for (const [agentName, agentPreset] of Object.entries(preset.opencode)) {
-        agentConfig[agentName] = { model: agentPreset.model };
+      const opencodeConfig = await loadOpencodeConfig();
+
+      if (!opencodeConfig) {
+        return "skipped (not found)";
       }
 
-      await this.client.config.update({
-        body: { agent: agentConfig },
-      });
+      // Update agent section only (preserve other settings)
+      opencodeConfig.agent = opencodeConfig.agent || {};
+      for (const [agentName, preset] of Object.entries(agentPresets)) {
+        opencodeConfig.agent[agentName] = {
+          ...opencodeConfig.agent[agentName],
+          model: preset.model,
+        };
+      }
+
+      await saveOpencodeConfig(opencodeConfig);
+      return "updated";
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      console.warn(`Failed to apply mode settings: ${message}`);
+      return `error: ${message}`;
+    }
+  }
+
+  /**
+   * Update oh-my-opencode.json agents section with preset values
+   * @returns Result status: "updated", "skipped (not found)", or "error: ..."
+   */
+  private async updateOhMyOpencodeConfig(
+    agentPresets: Record<string, { model: string }>
+  ): Promise<string> {
+    try {
+      const ohMyConfig = await loadOhMyOpencodeConfig();
+
+      if (!ohMyConfig) {
+        return "skipped (not found)";
+      }
+
+      // Update agents section only (preserve other settings)
+      ohMyConfig.agents = ohMyConfig.agents || {};
+      for (const [agentName, preset] of Object.entries(agentPresets)) {
+        if (ohMyConfig.agents[agentName]) {
+          ohMyConfig.agents[agentName] = { model: preset.model };
+        }
+      }
+
+      await saveOhMyOpencodeConfig(ohMyConfig);
+      return "updated";
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return `error: ${message}`;
     }
   }
 

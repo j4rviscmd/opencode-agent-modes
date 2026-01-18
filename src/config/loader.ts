@@ -86,6 +86,15 @@ export async function loadOpencodeConfig(): Promise<OpencodeConfig | null> {
 }
 
 /**
+ * Save the opencode configuration
+ */
+export async function saveOpencodeConfig(
+  config: OpencodeConfig
+): Promise<void> {
+  await saveJsonFile(getOpencodeConfigPath(), config);
+}
+
+/**
  * Load the oh-my-opencode configuration
  */
 export async function loadOhMyOpencodeConfig(): Promise<OhMyOpencodeConfig | null> {
