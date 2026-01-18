@@ -9,16 +9,18 @@ import { ModeManager } from "./modes/index.ts";
  * that configure which AI models are used for each agent type.
  */
 const modeSwitcherPlugin: Plugin = async ({ client }) => {
-  // Lazy initialization - don't block plugin load
-  let modeManager: ModeManager | null = null;
+  const modeManager = new ModeManager(client);
 
-  const getManager = async (): Promise<ModeManager> => {
-    if (!modeManager) {
-      modeManager = new ModeManager(client);
-      await modeManager.initialize();
-    }
-    return modeManager;
-  };
+  // Initialize on startup with error handling
+  try {
+    await modeManager.initialize();
+  } catch (error) {
+    // Log error but don't block opencode startup
+    console.error(
+      "[agent-mode-switcher] Failed to initialize:",
+      error instanceof Error ? error.message : String(error)
+    );
+  }
 
   return {
     tool: {
@@ -33,8 +35,7 @@ const modeSwitcherPlugin: Plugin = async ({ client }) => {
             .describe("Name of the mode preset to switch to"),
         },
         async execute({ mode }) {
-          const manager = await getManager();
-          return await manager.switchMode(mode);
+          return await modeManager.switchMode(mode);
         },
       }),
 
@@ -45,8 +46,7 @@ const modeSwitcherPlugin: Plugin = async ({ client }) => {
         description: "Show current agent mode and its configuration",
         args: {},
         async execute() {
-          const manager = await getManager();
-          return await manager.getStatus();
+          return await modeManager.getStatus();
         },
       }),
 
@@ -57,8 +57,7 @@ const modeSwitcherPlugin: Plugin = async ({ client }) => {
         description: "List all available mode presets",
         args: {},
         async execute() {
-          const manager = await getManager();
-          return await manager.listModes();
+          return await modeManager.listModes();
         },
       }),
     },
