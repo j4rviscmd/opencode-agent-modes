@@ -83,6 +83,17 @@ On first run, the plugin automatically generates this file by:
 }
 ```
 
+### Model Priority
+
+When both global `model` and agent-specific `opencode` settings are configured,
+the priority is:
+
+```text
+agent.<name>.model > model (global)
+```
+
+Agent-specific settings override the global model setting.
+
 ## Notes
 
 - Changes to oh-my-opencode agents require an opencode restart to take effect
