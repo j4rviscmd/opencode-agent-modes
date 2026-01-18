@@ -1,5 +1,11 @@
 # opencode-agent-modes
 
+[![npm license](https://img.shields.io/npm/l/opencode-agent-modes?logo=npm&logoColor=fff)](https://www.npmjs.com/package/opencode-agent-modes)
+[![npm downloads](https://img.shields.io/npm/dt/opencode-agent-modes?logo=npm&logoColor=fff)](https://www.npmjs.com/package/opencode-agent-modes)
+[![npm version](https://img.shields.io/npm/v/opencode-agent-modes?logo=npm&logoColor=fff)](https://www.npmjs.com/package/opencode-agent-modes)
+![OpenCode Plugin](https://img.shields.io/badge/OpenCode-Plugin-4c8bf5)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=fff)
+
 OpenCode plugin to switch agent models between performance and economy modes.
 
 > [!NOTE]
@@ -15,23 +21,21 @@ OpenCode plugin to switch agent models between performance and economy modes.
 
 ## Installation
 
-### 1. Add the plugin to your opencode.json
+Add the plugin to your `opencode.json`:
 
 ```json
 {
-  "plugin": [
-    "file:///path/to/opencode-agent-modes/src/index.ts"
-  ]
+  "plugin": ["opencode-agent-modes@latest"]
 }
 ```
 
-### 2. Copy command files (optional)
+The following command files are automatically copied to
+`~/.config/opencode/command/` on installation:
 
-Copy the command files to enable Ctrl+P access:
-
-```bash
-cp commands/*.md ~/.config/opencode/command/
-```
+- `mode-performance.md`
+- `mode-economy.md`
+- `mode-status.md`
+- `mode-list.md`
 
 ## Usage
 

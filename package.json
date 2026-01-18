@@ -6,11 +6,17 @@
   "main": "src/index.ts",
   "type": "module",
   "private": false,
+  "files": [
+    "dist",
+    "commands"
+  ],
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "build": "bun build src/index.ts --outdir dist --format esm",
+    "build": "bun build src/index.ts --outdir dist --format esm && bun build scripts/postinstall.ts --outdir dist --format esm --target node",
     "lint": "bunx biome check src/",
-    "format": "bunx biome format --write src/"
+    "format": "bunx biome format --write src/",
+    "postinstall": "node dist/postinstall.js",
+    "prepublishOnly": "bun run build"
   },
   "keywords": [
     "opencode",
