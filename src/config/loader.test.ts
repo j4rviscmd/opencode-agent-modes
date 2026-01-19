@@ -2,12 +2,16 @@ import { describe, test, expect, beforeEach, afterEach } from 'bun:test'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
 import { rmSync, mkdirSync } from 'node:fs'
+import { parse as parseJsonc } from 'jsonc-parser'
 import {
   expandPath,
   getPluginConfigPath,
   getOpencodeConfigPath,
   getOhMyOpencodeConfigPath,
+  clearContentCache,
+  setContentCache,
 } from './loader.ts'
+import { modify, applyEdits, type ModificationOptions } from 'jsonc-parser'
 import type {
   ModeSwitcherConfig,
   OpencodeConfig,
@@ -82,6 +86,7 @@ describe('loader', () => {
 
     afterEach(() => {
       rmSync(testDir, { recursive: true, force: true })
+      clearContentCache()
     })
 
     describe('plugin config', () => {
@@ -210,6 +215,420 @@ describe('loader', () => {
         const file = Bun.file(join(testDir, 'nonexistent.json'))
         const exists = await file.exists()
         expect(exists).toBe(false)
+      })
+    })
+
+    describe('JSONC parsing', () => {
+      test('parses JSON with single-line comments', async () => {
+        const jsoncContent = `{
+  // This is a comment
+  "model": "anthropic/claude-sonnet-4",
+  "agent": {
+    // Another comment
+    "build": { "model": "anthropic/claude-sonnet-4" }
+  }
+}`
+        await Bun.write(testOpencodeConfigPath, jsoncContent)
+
+        const content = await Bun.file(testOpencodeConfigPath).text()
+        const parsed = parseJsonc(content) as OpencodeConfig
+
+        expect(parsed.model).toBe('anthropic/claude-sonnet-4')
+        expect(parsed.agent?.build?.model).toBe('anthropic/claude-sonnet-4')
+      })
+
+      test('parses JSON with block comments', async () => {
+        const jsoncContent = `{
+  /* This is a block comment */
+  "model": "anthropic/claude-sonnet-4",
+  /*
+   * Multi-line
+   * block comment
+   */
+  "agent": {
+    "build": { "model": "anthropic/claude-sonnet-4" }
+  }
+}`
+        await Bun.write(testOpencodeConfigPath, jsoncContent)
+
+        const content = await Bun.file(testOpencodeConfigPath).text()
+        const parsed = parseJsonc(content) as OpencodeConfig
+
+        expect(parsed.model).toBe('anthropic/claude-sonnet-4')
+        expect(parsed.agent?.build?.model).toBe('anthropic/claude-sonnet-4')
+      })
+
+      test('parses JSON with trailing commas', async () => {
+        const jsoncContent = `{
+  "model": "anthropic/claude-sonnet-4",
+  "agent": {
+    "build": { "model": "anthropic/claude-sonnet-4", },
+    "plan": { "model": "anthropic/claude-haiku", },
+  },
+}`
+        await Bun.write(testOpencodeConfigPath, jsoncContent)
+
+        const content = await Bun.file(testOpencodeConfigPath).text()
+        const parsed = parseJsonc(content) as OpencodeConfig
+
+        expect(parsed.model).toBe('anthropic/claude-sonnet-4')
+        expect(parsed.agent?.build?.model).toBe('anthropic/claude-sonnet-4')
+        expect(parsed.agent?.plan?.model).toBe('anthropic/claude-haiku')
+      })
+
+      test('parses JSON with comments and trailing commas combined', async () => {
+        const jsoncContent = `{
+  // Model configuration
+  "model": "anthropic/claude-sonnet-4",
+  /* Agent settings */
+  "agent": {
+    "build": {
+      "model": "anthropic/claude-sonnet-4", // high performance
+    },
+    "plan": {
+      "model": "anthropic/claude-haiku", /* fast model */
+    },
+  },
+}`
+        await Bun.write(testOpencodeConfigPath, jsoncContent)
+
+        const content = await Bun.file(testOpencodeConfigPath).text()
+        const parsed = parseJsonc(content) as OpencodeConfig
+
+        expect(parsed.model).toBe('anthropic/claude-sonnet-4')
+        expect(parsed.agent?.build?.model).toBe('anthropic/claude-sonnet-4')
+        expect(parsed.agent?.plan?.model).toBe('anthropic/claude-haiku')
+      })
+
+      test('standard JSON.parse fails on JSONC content', async () => {
+        const jsoncContent = `{
+  // This comment should break JSON.parse
+  "model": "test"
+}`
+        await Bun.write(testOpencodeConfigPath, jsoncContent)
+
+        const content = await Bun.file(testOpencodeConfigPath).text()
+
+        // JSON.parse should throw an error
+        expect(() => JSON.parse(content)).toThrow()
+
+        // jsonc-parser should succeed
+        const parsed = parseJsonc(content) as { model: string }
+        expect(parsed.model).toBe('test')
+      })
+    })
+
+    describe('comment preservation on save', () => {
+      const modifyOptions: ModificationOptions = {
+        formattingOptions: {
+          tabSize: 2,
+          insertSpaces: true,
+          eol: '\n',
+        },
+      }
+
+      /**
+       * Helper to update leaf values recursively (mirrors loader.ts logic)
+       */
+      function updateLeafValues(
+        content: string,
+        basePath: (string | number)[],
+        newValue: unknown
+      ): string {
+        if (newValue === null || typeof newValue !== 'object') {
+          const edits = modify(content, basePath, newValue, modifyOptions)
+          return applyEdits(content, edits)
+        }
+
+        if (Array.isArray(newValue)) {
+          const edits = modify(content, basePath, newValue, modifyOptions)
+          return applyEdits(content, edits)
+        }
+
+        const obj = newValue as Record<string, unknown>
+        let result = content
+
+        for (const key of Object.keys(obj)) {
+          result = updateLeafValues(result, [...basePath, key], obj[key])
+        }
+
+        return result
+      }
+
+      test('preserves single-line comments when updating values', () => {
+        const originalContent = `{
+  // Model configuration
+  "model": "anthropic/claude-sonnet-4",
+  // Agent settings
+  "agent": {
+    // Build agent
+    "build": { "model": "anthropic/claude-sonnet-4" }
+  }
+}`
+        const newData = {
+          model: 'opencode/glm-4.7-free',
+          agent: {
+            build: { model: 'opencode/glm-4.7-free' },
+          },
+        }
+
+        let content = originalContent
+        for (const key of Object.keys(newData)) {
+          content = updateLeafValues(
+            content,
+            [key],
+            newData[key as keyof typeof newData]
+          )
+        }
+
+        // Verify comments are preserved
+        expect(content).toContain('// Model configuration')
+        expect(content).toContain('// Agent settings')
+        expect(content).toContain('// Build agent')
+
+        // Verify values are updated
+        const parsed = parseJsonc(content) as OpencodeConfig
+        expect(parsed.model).toBe('opencode/glm-4.7-free')
+        expect(parsed.agent?.build?.model).toBe('opencode/glm-4.7-free')
+      })
+
+      test('preserves block comments when updating values', () => {
+        const originalContent = `{
+  /* Global model setting */
+  "model": "anthropic/claude-sonnet-4",
+  /*
+   * Agent configuration section
+   * Contains settings for all agents
+   */
+  "agent": {
+    "build": { "model": "anthropic/claude-sonnet-4" }
+  }
+}`
+        const newData = {
+          model: 'opencode/glm-4.7-free',
+          agent: {
+            build: { model: 'opencode/glm-4.7-free' },
+          },
+        }
+
+        let content = originalContent
+        for (const key of Object.keys(newData)) {
+          content = updateLeafValues(
+            content,
+            [key],
+            newData[key as keyof typeof newData]
+          )
+        }
+
+        // Verify block comments are preserved
+        expect(content).toContain('/* Global model setting */')
+        expect(content).toContain('* Agent configuration section')
+        expect(content).toContain('* Contains settings for all agents')
+
+        // Verify values are updated
+        const parsed = parseJsonc(content) as OpencodeConfig
+        expect(parsed.model).toBe('opencode/glm-4.7-free')
+        expect(parsed.agent?.build?.model).toBe('opencode/glm-4.7-free')
+      })
+
+      test('preserves inline comments when updating values', () => {
+        const originalContent = `{
+  "model": "anthropic/claude-sonnet-4", // main model
+  "agent": {
+    "build": { "model": "anthropic/claude-sonnet-4" } // build agent model
+  }
+}`
+        const newData = {
+          model: 'opencode/glm-4.7-free',
+          agent: {
+            build: { model: 'opencode/glm-4.7-free' },
+          },
+        }
+
+        let content = originalContent
+        for (const key of Object.keys(newData)) {
+          content = updateLeafValues(
+            content,
+            [key],
+            newData[key as keyof typeof newData]
+          )
+        }
+
+        // Verify inline comments are preserved
+        expect(content).toContain('// main model')
+        expect(content).toContain('// build agent model')
+
+        // Verify values are updated
+        const parsed = parseJsonc(content) as OpencodeConfig
+        expect(parsed.model).toBe('opencode/glm-4.7-free')
+        expect(parsed.agent?.build?.model).toBe('opencode/glm-4.7-free')
+      })
+
+      test('preserves trailing commas when updating values', () => {
+        const originalContent = `{
+  "model": "anthropic/claude-sonnet-4",
+  "agent": {
+    "build": { "model": "anthropic/claude-sonnet-4", },
+  },
+}`
+        const newData = {
+          model: 'opencode/glm-4.7-free',
+          agent: {
+            build: { model: 'opencode/glm-4.7-free' },
+          },
+        }
+
+        let content = originalContent
+        for (const key of Object.keys(newData)) {
+          content = updateLeafValues(
+            content,
+            [key],
+            newData[key as keyof typeof newData]
+          )
+        }
+
+        // Verify values are updated and file is still valid JSONC
+        const parsed = parseJsonc(content) as OpencodeConfig
+        expect(parsed.model).toBe('opencode/glm-4.7-free')
+        expect(parsed.agent?.build?.model).toBe('opencode/glm-4.7-free')
+      })
+
+      test('preserves mixed comments and trailing commas', () => {
+        const originalContent = `{
+  // Model configuration
+  "model": "anthropic/claude-sonnet-4", /* main model */
+  /* Agent settings */
+  "agent": {
+    "build": {
+      "model": "anthropic/claude-sonnet-4", // high performance
+    },
+    "plan": {
+      "model": "anthropic/claude-haiku", /* fast model */
+    },
+  },
+}`
+        const newData = {
+          model: 'opencode/glm-4.7-free',
+          agent: {
+            build: { model: 'opencode/glm-4.7-free' },
+            plan: { model: 'opencode/glm-4.7-free' },
+          },
+        }
+
+        let content = originalContent
+        for (const key of Object.keys(newData)) {
+          content = updateLeafValues(
+            content,
+            [key],
+            newData[key as keyof typeof newData]
+          )
+        }
+
+        // Verify comments are preserved
+        expect(content).toContain('// Model configuration')
+        expect(content).toContain('/* main model */')
+        expect(content).toContain('/* Agent settings */')
+        expect(content).toContain('// high performance')
+        expect(content).toContain('/* fast model */')
+
+        // Verify values are updated
+        const parsed = parseJsonc(content) as OpencodeConfig
+        expect(parsed.model).toBe('opencode/glm-4.7-free')
+        expect(parsed.agent?.build?.model).toBe('opencode/glm-4.7-free')
+        expect(parsed.agent?.plan?.model).toBe('opencode/glm-4.7-free')
+      })
+
+      test('handles deeply nested objects with comments', () => {
+        const originalContent = `{
+  // Root level comment
+  "agents": {
+    // Coder agent
+    "coder": {
+      // Model for coding tasks
+      "model": "anthropic/claude-sonnet-4"
+    },
+    // Reviewer agent
+    "reviewer": {
+      // Model for review tasks
+      "model": "anthropic/claude-haiku"
+    }
+  }
+}`
+        const newData = {
+          agents: {
+            coder: { model: 'opencode/glm-4.7-free' },
+            reviewer: { model: 'opencode/glm-4.7-free' },
+          },
+        }
+
+        let content = originalContent
+        for (const key of Object.keys(newData)) {
+          content = updateLeafValues(
+            content,
+            [key],
+            newData[key as keyof typeof newData]
+          )
+        }
+
+        // Verify all comments are preserved
+        expect(content).toContain('// Root level comment')
+        expect(content).toContain('// Coder agent')
+        expect(content).toContain('// Model for coding tasks')
+        expect(content).toContain('// Reviewer agent')
+        expect(content).toContain('// Model for review tasks')
+
+        // Verify values are updated
+        const parsed = parseJsonc(content) as OhMyOpencodeConfig
+        expect(parsed.agents?.coder?.model).toBe('opencode/glm-4.7-free')
+        expect(parsed.agents?.reviewer?.model).toBe('opencode/glm-4.7-free')
+      })
+
+      test('integration: setContentCache + saveJsonFile preserves comments', async () => {
+        const jsoncContent = `{
+  // Model configuration
+  "model": "anthropic/claude-sonnet-4",
+  // Agent settings
+  "agent": {
+    // Build agent
+    "build": { "model": "anthropic/claude-sonnet-4" }
+  }
+}`
+        // Simulate: file was loaded (content cached)
+        await Bun.write(testOpencodeConfigPath, jsoncContent)
+        setContentCache(testOpencodeConfigPath, jsoncContent)
+
+        // Load, modify, and save using the same pattern as saveJsonFile
+        const originalContent = jsoncContent
+        const newData: OpencodeConfig = {
+          model: 'opencode/glm-4.7-free',
+          agent: {
+            build: { model: 'opencode/glm-4.7-free' },
+          },
+        }
+
+        let content = originalContent
+        for (const key of Object.keys(newData)) {
+          content = updateLeafValues(
+            content,
+            [key],
+            newData[key as keyof typeof newData]
+          )
+        }
+
+        await Bun.write(testOpencodeConfigPath, content)
+
+        // Read back and verify
+        const savedContent = await Bun.file(testOpencodeConfigPath).text()
+
+        // Verify comments are preserved
+        expect(savedContent).toContain('// Model configuration')
+        expect(savedContent).toContain('// Agent settings')
+        expect(savedContent).toContain('// Build agent')
+
+        // Verify values are updated
+        const parsed = parseJsonc(savedContent) as OpencodeConfig
+        expect(parsed.model).toBe('opencode/glm-4.7-free')
+        expect(parsed.agent?.build?.model).toBe('opencode/glm-4.7-free')
       })
     })
   })

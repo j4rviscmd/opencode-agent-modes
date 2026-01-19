@@ -1,6 +1,6 @@
-import { tool } from '@opencode-ai/plugin'
-import type { Plugin } from '@opencode-ai/plugin'
-import { ModeManager } from './modes/index.ts'
+import { tool } from "@opencode-ai/plugin";
+import type { Plugin } from "@opencode-ai/plugin";
+import { ModeManager } from "./modes/index.ts";
 
 /**
  * OpenCode Agent Mode Switcher Plugin
@@ -9,17 +9,17 @@ import { ModeManager } from './modes/index.ts'
  * that configure which AI models are used for each agent type.
  */
 const modeSwitcherPlugin: Plugin = async ({ client }) => {
-  const modeManager = new ModeManager(client)
+  const modeManager = new ModeManager(client);
 
   // Initialize on startup with error handling
   try {
-    await modeManager.initialize()
+    await modeManager.initialize();
   } catch (error) {
     // Log error but don't block opencode startup
     console.error(
-      '[agent-mode-switcher] Failed to initialize:',
+      "[agent-mode-switcher] Failed to initialize:",
       error instanceof Error ? error.message : String(error)
-    )
+    );
   }
 
   return {
@@ -28,14 +28,14 @@ const modeSwitcherPlugin: Plugin = async ({ client }) => {
        * Switch to a different agent mode preset
        */
       mode_switch: tool({
-        description: 'Switch agent mode to a specified preset',
+        description: "Switch agent mode to a specified preset",
         args: {
           mode: tool.schema
             .string()
-            .describe('Name of the mode preset to switch to'),
+            .describe("Name of the mode preset to switch to"),
         },
         async execute({ mode }) {
-          return await modeManager.switchMode(mode)
+          return await modeManager.switchMode(mode);
         },
       }),
 
@@ -43,10 +43,10 @@ const modeSwitcherPlugin: Plugin = async ({ client }) => {
        * Display current agent mode and configuration
        */
       mode_status: tool({
-        description: 'Show current agent mode and its configuration',
+        description: "Show current agent mode and its configuration",
         args: {},
         async execute() {
-          return await modeManager.getStatus()
+          return await modeManager.getStatus();
         },
       }),
 
@@ -54,14 +54,14 @@ const modeSwitcherPlugin: Plugin = async ({ client }) => {
        * List all available mode presets
        */
       mode_list: tool({
-        description: 'List all available mode presets',
+        description: "List all available mode presets",
         args: {},
         async execute() {
-          return await modeManager.listModes()
+          return await modeManager.listModes();
         },
       }),
     },
-  }
-}
+  };
+};
 
-export default modeSwitcherPlugin
+export default modeSwitcherPlugin;
