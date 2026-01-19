@@ -70,7 +70,7 @@ On first run, the plugin automatically generates this file by:
 
 ### Example Configuration
 
-> [!NOTE]
+> [!TIP]
 > The `oh-my-opencode` section is optional. Omit it if you don't use oh-my-opencode.
 
 ```json
