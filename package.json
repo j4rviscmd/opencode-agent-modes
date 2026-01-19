@@ -3,16 +3,28 @@
   "version": "0.1.0",
   "description": "OpenCode plugin to switch agent modes between performance and economy presets",
   "module": "src/index.ts",
-  "main": "src/index.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "type": "module",
   "private": false,
   "files": [
-    "dist",
+    "dist/*.js",
+    "dist/*.d.ts",
+    "dist/config",
+    "dist/modes",
     "commands"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/j4rviscmd/opencode-agent-modes.git"
+  },
+  "homepage": "https://github.com/j4rviscmd/opencode-agent-modes#readme",
+  "bugs": {
+    "url": "https://github.com/j4rviscmd/opencode-agent-modes/issues"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "build": "bun build src/index.ts --outdir dist --format esm && bun build scripts/postinstall.ts --outdir dist --format esm --target node",
+    "build": "bun build src/index.ts --outdir dist --format esm && bun build scripts/postinstall.ts --outdir dist --format esm --target node && tsc -p tsconfig.build.json",
     "lint": "bunx biome check src/",
     "format": "prettier --write 'src/**/*.ts'",
     "format:check": "prettier --check 'src/**/*.ts'",
@@ -29,8 +41,11 @@
     "mode",
     "switcher"
   ],
-  "author": "",
+  "author": "j4rviscmd",
   "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
   "devDependencies": {
     "@types/bun": "latest",
     "prettier": "^3.8.0"

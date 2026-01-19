@@ -1,0 +1,20 @@
+# Test utilities
+dist/test-utils/
+
+# Source files
+src/
+
+# Test files
+*.test.ts
+*.spec.ts
+
+# Config files
+tsconfig.json
+tsconfig.build.json
+biome.json
+.prettierrc
+
+# Development
+.git/
+.github/
+scripts/
