@@ -23,20 +23,40 @@ bun run lint
 
 # Format
 bun run format
+
+# Test
+bun test
+bun test --watch
+bun test --coverage
 ```
 
 ## Architecture
 
 ```text
 src/
-├── index.ts              # Plugin entry point, tool definitions
+├── index.ts                    # Plugin entry point, tool definitions
 ├── config/
-│   ├── types.ts          # Type definitions and constants
-│   ├── loader.ts         # JSON file I/O utilities
-│   └── initializer.ts    # Initial config generation
-└── modes/
-    ├── index.ts          # Barrel export
-    └── manager.ts        # Mode switching logic
+│   ├── index.ts                # Barrel export
+│   ├── types.ts                # Type definitions and constants
+│   ├── loader.ts               # JSON file I/O utilities
+│   ├── loader.test.ts          # Unit tests for loader
+│   ├── initializer.ts          # Initial config generation
+│   └── initializer.test.ts     # Unit tests for initializer
+├── modes/
+│   ├── index.ts                # Barrel export
+│   ├── manager.ts              # Mode switching logic
+│   └── manager.test.ts         # Unit tests for manager
+└── test-utils/
+    └── mocks.ts                # Shared test mocks
+
+scripts/
+└── postinstall.ts              # npm postinstall script
+
+commands/
+├── mode-economy.md             # /mode-economy slash command
+├── mode-performance.md         # /mode-performance slash command
+├── mode-list.md                # /mode-list slash command
+└── mode-status.md              # /mode-status slash command
 ```
 
 ### Key Components
@@ -53,6 +73,8 @@ src/
 - **Config Initializer** (`src/config/initializer.ts`): On first run, reads
   current models from existing configs to build "performance" preset, creates
   "economy" preset with `opencode/glm-4.7-free`
+
+- **Slash Commands** (`commands/`): User-invocable commands for mode switching
 
 ### Plugin API
 
