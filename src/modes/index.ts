@@ -1,1 +1,1 @@
-export { ModeManager } from "./manager.ts";
+export { ModeManager } from './manager.ts'
