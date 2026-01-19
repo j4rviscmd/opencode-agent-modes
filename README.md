@@ -13,6 +13,10 @@ OpenCode plugin to switch agent models between performance and economy modes.
 > pre-defined economy models to extend your session until your quota resets.
 > Changes take effect after restarting opencode.
 
+<p align="center">
+  <img src="assets/image/sample.png" width="700" alt="Change mode example" />
+</p>
+
 ## Features
 
 - Switch between different model presets (performance, economy, or custom)
@@ -21,7 +25,7 @@ OpenCode plugin to switch agent models between performance and economy modes.
 
 ### Supported Agents
 
-|      Agent Type       |                                           Description                                           |
+| Agent Type            | Description                                                                                     |
 | --------------------- | ----------------------------------------------------------------------------------------------- |
 | opencode agents       | Standard agents (`build`, `plan`, etc.)                                                         |
 | oh-my-opencode agents | Optional - applies if [oh-my-opencode](https://github.com/pekepeke/oh-my-opencode) is installed |
