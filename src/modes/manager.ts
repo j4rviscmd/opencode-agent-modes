@@ -219,9 +219,7 @@ export class ModeManager {
       // Update agents section only (preserve other settings)
       ohMyConfig.agents = ohMyConfig.agents || {}
       for (const [agentName, preset] of Object.entries(agentPresets)) {
-        if (ohMyConfig.agents[agentName]) {
-          ohMyConfig.agents[agentName] = { model: preset.model }
-        }
+        ohMyConfig.agents[agentName] = { model: preset.model }
       }
 
       await saveOhMyOpencodeConfig(ohMyConfig)
