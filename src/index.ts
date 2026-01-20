@@ -1,6 +1,7 @@
 import { tool } from "@opencode-ai/plugin";
 import type { Plugin } from "@opencode-ai/plugin";
 import { ModeManager } from "./modes/index.ts";
+import { copyCommandFiles } from "./config/index.ts";
 
 /**
  * OpenCode Agent Mode Switcher Plugin
@@ -14,6 +15,8 @@ const modeSwitcherPlugin: Plugin = async ({ client }) => {
   // Initialize on startup with error handling
   try {
     await modeManager.initialize();
+    // Copy slash command files to ~/.config/opencode/command/
+    copyCommandFiles();
   } catch (error) {
     // Log error but don't block opencode startup
     console.error(

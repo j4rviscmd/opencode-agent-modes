@@ -1,6 +1,6 @@
 {
   "name": "opencode-agent-modes",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "OpenCode plugin to switch agent modes between performance and economy presets",
   "module": "src/index.ts",
   "main": "dist/index.js",
@@ -24,7 +24,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "build": "bun build src/index.ts --outdir dist --format esm && bun build scripts/postinstall.ts --outdir dist --format esm --target node && tsc -p tsconfig.build.json",
+    "build": "bun build src/index.ts --outdir dist --format esm --target bun && bun build scripts/postinstall.ts --outdir dist --format esm --target node && tsc -p tsconfig.build.json",
     "lint": "bunx biome check src/",
     "format": "prettier --write 'src/**/*.ts'",
     "format:check": "prettier --check 'src/**/*.ts'",
