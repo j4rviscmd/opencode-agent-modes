@@ -40,8 +40,15 @@ Add the plugin to your `opencode.json`:
 }
 ```
 
-The following command files are automatically copied to
-`~/.config/opencode/command/` on installation:
+> [!CAUTION]
+> **One-time setup required**: OpenCode does not execute npm postinstall scripts.
+> Run this command once after initial installation to enable slash commands:
+>
+> ```bash
+> cd ~/.cache/opencode/node_modules/opencode-agent-modes && node dist/postinstall.js
+> ```
+
+The following command files are copied to `~/.config/opencode/command/`:
 
 - `mode-performance.md`
 - `mode-economy.md`
