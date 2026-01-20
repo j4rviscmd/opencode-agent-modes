@@ -24,14 +24,13 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "build": "bun build src/index.ts --outdir dist --format esm --target bun && bun build scripts/postinstall.ts --outdir dist --format esm --target node && tsc -p tsconfig.build.json",
+    "build": "bun build src/index.ts --outdir dist --format esm --target bun && tsc -p tsconfig.build.json",
     "lint": "bunx biome check src/",
     "format": "prettier --write 'src/**/*.ts'",
     "format:check": "prettier --check 'src/**/*.ts'",
     "test": "bun test",
     "test:watch": "bun test --watch",
     "test:coverage": "bun test --coverage",
-    "postinstall": "node dist/postinstall.js",
     "prepublishOnly": "bun run build"
   },
   "keywords": [
