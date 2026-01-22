@@ -1,9 +1,9 @@
-import { describe, test, expect, beforeEach } from 'bun:test'
+import { beforeEach, describe, expect, test } from 'bun:test'
 import type { OpencodeClient } from '@opencode-ai/sdk'
 import type {
   ModeSwitcherConfig,
-  OpencodeConfig,
   OhMyOpencodeConfig,
+  OpencodeConfig,
 } from '../config/types.ts'
 import { createMockOpencodeClient, sampleConfigs } from '../test-utils/mocks.ts'
 

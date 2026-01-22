@@ -25,29 +25,23 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "bun build src/index.ts --outdir dist --format esm --target bun && tsc -p tsconfig.build.json",
-    "lint": "bunx biome check src/",
-    "format": "prettier --write 'src/**/*.ts'",
-    "format:check": "prettier --check 'src/**/*.ts'",
+    "lint": "bunx biome check .",
+    "format": "bunx biome format --write .",
+    "format:check": "bunx biome format .",
     "test": "bun test",
     "test:watch": "bun test --watch",
     "test:coverage": "bun test --coverage",
     "prepublishOnly": "bun run build"
   },
-  "keywords": [
-    "opencode",
-    "plugin",
-    "agent",
-    "mode",
-    "switcher"
-  ],
+  "keywords": ["opencode", "plugin", "agent", "mode", "switcher"],
   "author": "j4rviscmd",
   "license": "MIT",
   "engines": {
     "node": ">=18"
   },
   "devDependencies": {
-    "@types/bun": "latest",
-    "prettier": "^3.8.0"
+    "@biomejs/biome": "^1.9.4",
+    "@types/bun": "latest"
   },
   "peerDependencies": {
     "typescript": "^5"
