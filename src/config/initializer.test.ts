@@ -1,8 +1,8 @@
-import { describe, test, expect, beforeEach, afterEach } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
-import { rmSync, mkdirSync } from 'node:fs'
 import { validateConfig } from './initializer.ts'
-import type { ModeSwitcherConfig, ModePreset } from './types.ts'
+import type { ModePreset, ModeSwitcherConfig } from './types.ts'
 
 describe('initializer', () => {
   describe('validateConfig', () => {

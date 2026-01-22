@@ -1,15 +1,15 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import {
-  parse as parseJsonc,
-  modify,
-  applyEdits,
   type ModificationOptions,
+  applyEdits,
+  modify,
+  parse as parseJsonc,
 } from 'jsonc-parser'
 import type {
   ModeSwitcherConfig,
-  OpencodeConfig,
   OhMyOpencodeConfig,
+  OpencodeConfig,
 } from './types.ts'
 
 /**
@@ -344,8 +344,7 @@ export async function saveOhMyOpencodeConfig(
  * @returns True if agent-mode-switcher.json exists, false otherwise
  */
 export async function pluginConfigExists(): Promise<boolean> {
-  const file = Bun.file(getPluginConfigPath())
-  return await file.exists()
+  return Bun.file(getPluginConfigPath()).exists()
 }
 
 /**

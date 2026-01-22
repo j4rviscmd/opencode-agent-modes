@@ -9,7 +9,7 @@
  * @module config/command-installer
  */
 
-import { copyFileSync, mkdirSync, readdirSync, existsSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -53,7 +53,7 @@ function findCommandsDir(): string | null {
 
   // Try multiple paths to support different build outputs
   const candidates = [
-    join(__dirname, '..', 'commands'),       // Production: dist/ -> commands/
+    join(__dirname, '..', 'commands'), // Production: dist/ -> commands/
     join(__dirname, '..', '..', 'commands'), // Development: src/config/ -> commands/
   ]
 
@@ -92,13 +92,10 @@ export function copyCommandFiles(): number {
   }
 
   try {
-    // Create destination directory with parents if needed
     mkdirSync(COMMANDS_DEST, { recursive: true })
 
-    // Filter only markdown files
     const files = readdirSync(commandsSrc).filter((f) => f.endsWith('.md'))
 
-    // Copy each command file to the destination
     for (const file of files) {
       copyFileSync(join(commandsSrc, file), join(COMMANDS_DEST, file))
     }
