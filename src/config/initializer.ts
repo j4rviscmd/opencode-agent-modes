@@ -1,15 +1,19 @@
-import type { ModeSwitcherConfig, ModePreset, AgentPreset } from './types.ts'
-import { DEFAULT_ECONOMY_MODEL } from './types.ts'
 import {
-  loadOpencodeConfig,
   loadOhMyOpencodeConfig,
+  loadOpencodeConfig,
   loadPluginConfig,
-  savePluginConfig,
   pluginConfigExists,
+  savePluginConfig,
 } from './loader.ts'
+import type { AgentPreset, ModePreset, ModeSwitcherConfig } from './types.ts'
+import { DEFAULT_ECONOMY_MODEL } from './types.ts'
 
 /**
- * Default opencode agent names
+ * Default opencode agent names.
+ *
+ * These are the standard agents used by OpenCode for various tasks.
+ *
+ * @constant
  */
 const OPENCODE_AGENTS = [
   'build',
@@ -22,7 +26,19 @@ const OPENCODE_AGENTS = [
 ] as const
 
 /**
- * Build a preset from existing configurations
+ * Builds a performance preset from existing OpenCode configurations.
+ *
+ * This function scans the current `opencode.json` and `oh-my-opencode.json`
+ * files to extract the currently configured models for each agent. These
+ * models are saved as the "performance" preset, preserving the user's
+ * high-performance model choices.
+ *
+ * @returns Promise resolving to a ModePreset with performance-oriented models
+ * @example
+ * ```typescript
+ * const preset = await buildPerformancePreset();
+ * console.log(preset.opencode.build.model); // "anthropic/claude-sonnet-4"
+ * ```
  */
 async function buildPerformancePreset(): Promise<ModePreset> {
   const opencodeConfig = await loadOpencodeConfig()
@@ -64,7 +80,19 @@ async function buildPerformancePreset(): Promise<ModePreset> {
 }
 
 /**
- * Build economy preset with free model
+ * Builds an economy preset using the default free model.
+ *
+ * This function creates a cost-efficient preset where all agents
+ * (both OpenCode and oh-my-opencode) are configured to use the
+ * `opencode/glm-4.7-free` model. This provides a budget-friendly
+ * alternative to performance mode for routine tasks.
+ *
+ * @returns Promise resolving to a ModePreset with economy-oriented models
+ * @example
+ * ```typescript
+ * const preset = await buildEconomyPreset();
+ * console.log(preset.model); // "opencode/glm-4.7-free"
+ * ```
  */
 async function buildEconomyPreset(): Promise<ModePreset> {
   const opencodeConfig = await loadOpencodeConfig()
@@ -101,8 +129,27 @@ async function buildEconomyPreset(): Promise<ModePreset> {
 }
 
 /**
- * Initialize the plugin configuration if it doesn't exist
- * @returns The configuration (existing or newly created)
+ * Initializes the plugin configuration if it doesn't exist.
+ *
+ * This function performs the following steps:
+ * 1. Checks if a configuration file already exists
+ * 2. If exists, loads and returns it
+ * 3. If not, creates a new configuration by:
+ *    - Building a performance preset from current settings
+ *    - Building an economy preset with free models
+ *    - Setting default mode to "performance"
+ *    - Saving the configuration to disk
+ *
+ * This is called on plugin startup to ensure a valid configuration
+ * is always available.
+ *
+ * @returns Promise resolving to the configuration (existing or newly created)
+ * @throws {Error} If configuration creation or file I/O fails
+ * @example
+ * ```typescript
+ * const config = await initializeConfig();
+ * console.log(config.currentMode); // "performance"
+ * ```
  */
 export async function initializeConfig(): Promise<ModeSwitcherConfig> {
   const exists = await pluginConfigExists()
@@ -134,7 +181,24 @@ export async function initializeConfig(): Promise<ModeSwitcherConfig> {
 }
 
 /**
- * Ensure configuration is valid and has required presets
+ * Validates that a configuration object is well-formed and has required presets.
+ *
+ * This function performs the following checks:
+ * - `currentMode` field is present and non-empty
+ * - `presets` object exists and contains at least one preset
+ * - A preset exists for the current mode
+ *
+ * @param config - The configuration object to validate
+ * @returns True if configuration is valid, false otherwise
+ * @example
+ * ```typescript
+ * const config = await loadPluginConfig();
+ * if (validateConfig(config)) {
+ *   console.log('Configuration is valid');
+ * } else {
+ *   console.error('Invalid configuration detected');
+ * }
+ * ```
  */
 export function validateConfig(config: ModeSwitcherConfig): boolean {
   if (!config.currentMode) {
@@ -143,8 +207,5 @@ export function validateConfig(config: ModeSwitcherConfig): boolean {
   if (!config.presets || Object.keys(config.presets).length === 0) {
     return false
   }
-  if (!config.presets[config.currentMode]) {
-    return false
-  }
-  return true
+  return Boolean(config.presets[config.currentMode])
 }

@@ -1,21 +1,21 @@
-import { describe, test, expect, beforeEach, afterEach } from 'bun:test'
-import { join } from 'node:path'
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { mkdirSync, rmSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { rmSync, mkdirSync } from 'node:fs'
+import { join } from 'node:path'
 import { parse as parseJsonc } from 'jsonc-parser'
+import { type ModificationOptions, applyEdits, modify } from 'jsonc-parser'
 import {
-  expandPath,
-  getPluginConfigPath,
-  getOpencodeConfigPath,
-  getOhMyOpencodeConfigPath,
   clearContentCache,
+  expandPath,
+  getOhMyOpencodeConfigPath,
+  getOpencodeConfigPath,
+  getPluginConfigPath,
   setContentCache,
 } from './loader.ts'
-import { modify, applyEdits, type ModificationOptions } from 'jsonc-parser'
 import type {
   ModeSwitcherConfig,
-  OpencodeConfig,
   OhMyOpencodeConfig,
+  OpencodeConfig,
 } from './types.ts'
 
 describe('loader', () => {

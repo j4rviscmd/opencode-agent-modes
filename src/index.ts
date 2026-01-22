@@ -10,8 +10,8 @@
 
 import { tool } from '@opencode-ai/plugin'
 import type { Plugin } from '@opencode-ai/plugin'
-import { ModeManager } from './modes/index.ts'
 import { copyCommandFiles } from './config/index.ts'
+import { ModeManager } from './modes/index.ts'
 
 /**
  * OpenCode Agent Mode Switcher Plugin.

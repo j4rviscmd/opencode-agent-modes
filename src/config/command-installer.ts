@@ -9,7 +9,7 @@
  * @module config/command-installer
  */
 
-import { copyFileSync, mkdirSync, readdirSync, existsSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'

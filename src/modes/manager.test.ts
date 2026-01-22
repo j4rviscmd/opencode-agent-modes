@@ -8,15 +8,24 @@ import type {
 import { createMockOpencodeClient, sampleConfigs } from '../test-utils/mocks.ts'
 
 /**
- * Create a mock ModeManager for testing
- * This avoids the complexity of mocking file system operations
+ * Mock implementation of ModeManager for testing purposes.
+ *
+ * This test double avoids the complexity of mocking file system operations
+ * by storing configuration in memory. It implements the same public API
+ * as the real ModeManager but uses in-memory state instead of reading/writing
+ * JSON files.
+ *
+ * @internal
  */
 class MockModeManager {
   private config: ModeSwitcherConfig | null = null
   private opencodeConfig: OpencodeConfig | null = null
   private ohMyConfig: OhMyOpencodeConfig | null = null
+  private client: OpencodeClient
 
-  constructor(_client: OpencodeClient) {}
+  constructor(client: OpencodeClient) {
+    this.client = client
+  }
 
   setConfig(config: ModeSwitcherConfig): void {
     this.config = config
@@ -43,7 +52,10 @@ class MockModeManager {
     if (!this.config) {
       await this.initialize()
     }
-    return this.config!
+    if (!this.config) {
+      throw new Error('Config not initialized')
+    }
+    return this.config
   }
 
   async getCurrentMode(): Promise<string> {
