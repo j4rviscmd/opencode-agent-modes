@@ -147,7 +147,38 @@ To add a custom preset (e.g., "premium"):
 
 3. Restart opencode to apply changes.
 
-## Notes
+> [!INFO]
+> - Changes require an opencode restart to take effect
+> - Custom mode presets can be added by editing the configuration file
 
-- Changes require an opencode restart to take effect
-- Custom mode presets can be added by editing the configuration file
+## Development
+
+This project uses [Bun](https://bun.sh/) as the runtime and package manager.
+
+### Prerequisites
+
+- [Bun](https://bun.sh/) v1.0 or later
+
+### Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/j4rviscmd/opencode-agent-modes.git
+cd opencode-agent-modes
+
+# Install dependencies
+bun install
+
+# Run tests
+bun test
+
+# Type check
+bun run typecheck
+
+# Lint & format
+bun run lint
+bun run format
+
+# Build
+bun run build
+```
