@@ -111,7 +111,11 @@ export class ModeManager {
     await this.updateOhMyOpencodeConfig(preset['oh-my-opencode'])
 
     // Notify user to restart (fire-and-forget to avoid blocking
-    // plugin initialization when UI is not yet ready)
+    // plugin initialization when UI is not yet ready).
+    // TODO: Currently toast is likely not displayed because UI is
+    // not initialized at this point. To reliably show the toast,
+    // use setTimeout for delayed execution or an onReady lifecycle
+    // hook if OpenCode adds one in the future.
     this.client.tui
       .showToast({
         body: {
