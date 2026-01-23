@@ -59,6 +59,7 @@ export class ModeManager {
    */
   async initialize(): Promise<void> {
     this.config = await initializeConfig()
+    await this.applyCurrentModeIfNeeded()
   }
 
   /**
@@ -76,6 +77,100 @@ export class ModeManager {
       this.config = await initializeConfig()
     }
     return this.config
+  }
+
+  /**
+   * Checks if actual config files have drifted from the current
+   * mode preset and applies the preset if needed.
+   *
+   * This handles the case where a user manually edits
+   * `agent-mode-switcher.json` to change `currentMode` while
+   * OpenCode is not running. On next startup, the actual config
+   * files are updated to match the expected preset values,
+   * and a toast notification prompts the user to restart.
+   *
+   * @private
+   */
+  private async applyCurrentModeIfNeeded(): Promise<void> {
+    if (!this.config) {
+      return
+    }
+
+    const preset = this.config.presets[this.config.currentMode]
+    if (!preset) {
+      return
+    }
+
+    const drifted = await this.hasConfigDrift(preset)
+    if (!drifted) {
+      return
+    }
+
+    // Apply the preset to actual config files
+    await this.updateOpencodeConfig(preset.model, preset.opencode)
+    await this.updateOhMyOpencodeConfig(preset['oh-my-opencode'])
+
+    // Notify user to restart (fire-and-forget to avoid blocking
+    // plugin initialization when UI is not yet ready)
+    this.client.tui
+      .showToast({
+        body: {
+          title: 'Mode Applied',
+          message: `Applied "${this.config.currentMode}" mode. Restart opencode to take effect.`,
+          variant: 'warning',
+          duration: 5000,
+        },
+      })
+      .catch(() => {
+        // Toast might not be available during early initialization
+      })
+  }
+
+  /**
+   * Compares a mode preset against the actual opencode.json and
+   * oh-my-opencode.json files to detect configuration drift.
+   *
+   * Checks global model and per-agent model values. Returns true
+   * if any expected value differs from the actual file content.
+   *
+   * @param preset - The mode preset to compare against
+   * @returns True if actual configs differ from the preset
+   * @private
+   */
+  private async hasConfigDrift(preset: ModePreset): Promise<boolean> {
+    const opencodeConfig = await loadOpencodeConfig()
+    const ohMyConfig = await loadOhMyOpencodeConfig()
+
+    // Check global model in opencode.json
+    if (preset.model && opencodeConfig) {
+      if (opencodeConfig.model !== preset.model) {
+        return true
+      }
+    }
+
+    // Check opencode agent models
+    if (opencodeConfig?.agent) {
+      for (const [agentName, agentPreset] of Object.entries(preset.opencode)) {
+        const actual = opencodeConfig.agent[agentName]
+        if (actual?.model !== agentPreset.model) {
+          return true
+        }
+      }
+    }
+
+    // Check oh-my-opencode agent models
+    if (ohMyConfig?.agents) {
+      for (const [agentName, agentPreset] of Object.entries(
+        preset['oh-my-opencode']
+      )) {
+        const actual = ohMyConfig.agents[agentName]
+        if (actual?.model !== agentPreset.model) {
+          return true
+        }
+      }
+    }
+
+    return false
   }
 
   /**
@@ -316,13 +411,11 @@ export class ModeManager {
       }
 
       // Update agent section (preserve other settings)
-      if (Object.keys(agentPresets).length > 0) {
-        opencodeConfig.agent = opencodeConfig.agent || {}
-        for (const [agentName, preset] of Object.entries(agentPresets)) {
-          opencodeConfig.agent[agentName] = {
-            ...opencodeConfig.agent[agentName],
-            model: preset.model,
-          }
+      opencodeConfig.agent = opencodeConfig.agent || {}
+      for (const [agentName, preset] of Object.entries(agentPresets)) {
+        opencodeConfig.agent[agentName] = {
+          ...opencodeConfig.agent[agentName],
+          model: preset.model,
         }
       }
 
