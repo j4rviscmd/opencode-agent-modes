@@ -1,11 +1,21 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
 import type { OpencodeClient } from '@opencode-ai/sdk'
 import type {
+  ModePreset,
   ModeSwitcherConfig,
   OhMyOpencodeConfig,
   OpencodeConfig,
 } from '../config/types.ts'
 import { createMockOpencodeClient, sampleConfigs } from '../test-utils/mocks.ts'
+
+/**
+ * Creates a deep copy of the sample plugin config for isolated test use.
+ */
+function clonePluginConfig(): ModeSwitcherConfig {
+  return JSON.parse(
+    JSON.stringify(sampleConfigs.pluginConfig)
+  ) as ModeSwitcherConfig
+}
 
 /**
  * Mock implementation of ModeManager for testing purposes.
@@ -22,6 +32,9 @@ class MockModeManager {
   private opencodeConfig: OpencodeConfig | null = null
   private ohMyConfig: OhMyOpencodeConfig | null = null
   private client: OpencodeClient
+
+  /** Tracks whether a drift-toast was shown during initialize */
+  lastDriftToast: string | null = null
 
   constructor(client: OpencodeClient) {
     this.client = client
@@ -41,11 +54,79 @@ class MockModeManager {
 
   async initialize(): Promise<void> {
     if (!this.config) {
-      // Deep copy to avoid state sharing between tests
-      this.config = JSON.parse(
-        JSON.stringify(sampleConfigs.pluginConfig)
-      ) as ModeSwitcherConfig
+      this.config = clonePluginConfig()
     }
+    await this.applyCurrentModeIfNeeded()
+  }
+
+  private async applyCurrentModeIfNeeded(): Promise<void> {
+    if (!this.config) {
+      return
+    }
+
+    const preset = this.config.presets[this.config.currentMode]
+    if (!preset) {
+      return
+    }
+
+    const drifted = this.hasConfigDrift(preset)
+    if (!drifted) {
+      return
+    }
+
+    // Apply preset to in-memory configs
+    if (this.opencodeConfig) {
+      if (preset.model) {
+        this.opencodeConfig.model = preset.model
+      }
+      this.opencodeConfig.agent = this.opencodeConfig.agent || {}
+      for (const [name, p] of Object.entries(preset.opencode)) {
+        this.opencodeConfig.agent[name] = {
+          ...this.opencodeConfig.agent[name],
+          model: p.model,
+        }
+      }
+    }
+
+    if (this.ohMyConfig) {
+      this.ohMyConfig.agents = this.ohMyConfig.agents || {}
+      for (const [name, p] of Object.entries(preset['oh-my-opencode'])) {
+        this.ohMyConfig.agents[name] = { model: p.model }
+      }
+    }
+
+    this.lastDriftToast = `Applied "${this.config.currentMode}" mode. Restart opencode to take effect.`
+  }
+
+  private hasConfigDrift(preset: ModePreset): boolean {
+    // Check global model
+    if (preset.model && this.opencodeConfig) {
+      if (this.opencodeConfig.model !== preset.model) {
+        return true
+      }
+    }
+
+    // Check opencode agent models
+    if (this.opencodeConfig?.agent) {
+      for (const [name, p] of Object.entries(preset.opencode)) {
+        const actual = this.opencodeConfig.agent[name]
+        if (actual?.model !== p.model) {
+          return true
+        }
+      }
+    }
+
+    // Check oh-my-opencode agent models
+    if (this.ohMyConfig?.agents) {
+      for (const [name, p] of Object.entries(preset['oh-my-opencode'])) {
+        const actual = this.ohMyConfig.agents[name]
+        if (actual?.model !== p.model) {
+          return true
+        }
+      }
+    }
+
+    return false
   }
 
   private async ensureConfig(): Promise<ModeSwitcherConfig> {
@@ -382,6 +463,116 @@ describe('ModeManager', () => {
       await manager.initialize()
       const result = await manager.shouldShowToastOnStartup()
       expect(result).toBe(false)
+    })
+  })
+
+  describe('applyCurrentModeIfNeeded', () => {
+    test('applies preset when opencode.json has drifted', async () => {
+      // Set currentMode to economy but opencode.json has performance models
+      const config = clonePluginConfig()
+      config.currentMode = 'economy'
+      manager.setConfig(config)
+      manager.setOpencodeConfig({
+        model: 'anthropic/claude-sonnet-4',
+        agent: {
+          build: { model: 'anthropic/claude-sonnet-4' },
+          plan: { model: 'anthropic/claude-sonnet-4' },
+        },
+      })
+
+      await manager.initialize()
+
+      expect(manager.lastDriftToast).toContain('economy')
+      expect(manager.lastDriftToast).toContain('Restart opencode')
+    })
+
+    test('applies preset when oh-my-opencode.json has drifted', async () => {
+      const config = clonePluginConfig()
+      config.currentMode = 'economy'
+      manager.setConfig(config)
+      manager.setOhMyConfig({
+        agents: {
+          coder: { model: 'anthropic/claude-sonnet-4' },
+        },
+      })
+
+      await manager.initialize()
+
+      expect(manager.lastDriftToast).toContain('economy')
+    })
+
+    test('does not apply when configs match preset', async () => {
+      // Set currentMode to economy and configs already match
+      const config = clonePluginConfig()
+      config.currentMode = 'economy'
+      manager.setConfig(config)
+      manager.setOpencodeConfig({
+        model: 'opencode/glm-4.7-free',
+        agent: {
+          build: { model: 'opencode/glm-4.7-free' },
+          plan: { model: 'opencode/glm-4.7-free' },
+        },
+      })
+      manager.setOhMyConfig({
+        agents: {
+          coder: { model: 'opencode/glm-4.7-free' },
+        },
+      })
+
+      await manager.initialize()
+
+      expect(manager.lastDriftToast).toBeNull()
+    })
+
+    test('does nothing when preset is not found', async () => {
+      const config: ModeSwitcherConfig = {
+        currentMode: 'nonexistent',
+        showToastOnStartup: true,
+        presets: {
+          performance: {
+            description: 'Test',
+            opencode: {},
+            'oh-my-opencode': {},
+          },
+        },
+      }
+      manager.setConfig(config)
+      manager.setOpencodeConfig({
+        model: 'anthropic/claude-sonnet-4',
+        agent: { build: { model: 'anthropic/claude-sonnet-4' } },
+      })
+
+      await manager.initialize()
+
+      expect(manager.lastDriftToast).toBeNull()
+    })
+
+    test('does nothing when no config files exist', async () => {
+      const config = clonePluginConfig()
+      config.currentMode = 'economy'
+      manager.setConfig(config)
+      // Don't set opencodeConfig or ohMyConfig
+
+      await manager.initialize()
+
+      expect(manager.lastDriftToast).toBeNull()
+    })
+
+    test('detects drift on global model mismatch', async () => {
+      const config = clonePluginConfig()
+      config.currentMode = 'economy'
+      manager.setConfig(config)
+      manager.setOpencodeConfig({
+        model: 'anthropic/claude-sonnet-4', // Mismatch
+        agent: {
+          build: { model: 'opencode/glm-4.7-free' },
+          plan: { model: 'opencode/glm-4.7-free' },
+        },
+      })
+
+      await manager.initialize()
+
+      expect(manager.lastDriftToast).not.toBeNull()
     })
   })
 })
