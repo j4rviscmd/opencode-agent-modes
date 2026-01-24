@@ -150,6 +150,10 @@ To add a custom preset (e.g., "premium"):
 > [!INFO]
 > - Changes require an opencode restart to take effect
 > - Custom mode presets can be added by editing the configuration file
+> - Built-in command files (`mode-performance.md`, `mode-economy.md`, etc.)
+>   are overwritten on every plugin startup. Do not modify them directly.
+> - Custom command files (e.g., `mode-premium.md`) are not affected by
+>   this overwrite and will persist across restarts.
 
 ## Development
 
