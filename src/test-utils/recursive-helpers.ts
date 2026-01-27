@@ -10,7 +10,9 @@ import type { HierarchicalPreset } from '../config/types.ts'
  * @param value - The object value to check
  * @returns True if the value has a string `model` property
  */
-function isLeafNode(value: Record<string, unknown>): value is Record<string, unknown> & { model: string; variant?: string } {
+function isLeafNode(
+  value: Record<string, unknown>
+): value is Record<string, unknown> & { model: string; variant?: string } {
   return 'model' in value && typeof value.model === 'string'
 }
 
@@ -102,7 +104,10 @@ export function hasDriftRecursive(
       if (actualObj?.model !== expectedValue.model) {
         return true
       }
-      if (expectedValue.variant && actualObj?.variant !== expectedValue.variant) {
+      if (
+        expectedValue.variant &&
+        actualObj?.variant !== expectedValue.variant
+      ) {
         return true
       }
     } else {
@@ -168,7 +173,9 @@ export function formatHierarchicalTree(
       lines.push(`${indent}${key}: ${value.model}${variant}${extra}`)
     } else {
       lines.push(`${indent}${key}:`)
-      lines.push(formatHierarchicalTree(value as HierarchicalPreset, `${indent}  `))
+      lines.push(
+        formatHierarchicalTree(value as HierarchicalPreset, `${indent}  `)
+      )
     }
   }
 

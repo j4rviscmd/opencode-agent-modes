@@ -1,4 +1,5 @@
 import type { OpencodeClient } from '@opencode-ai/sdk'
+import { isObject } from '../config/guards.ts'
 import { initializeConfig } from '../config/initializer.ts'
 import {
   loadOhMyOpencodeConfig,
@@ -14,23 +15,33 @@ import type {
 } from '../config/types.ts'
 
 /**
- * Type guard to check if a value is a plain object (not null, not array).
+ * Checks if a value is a leaf node (has a model field).
  *
- * @param obj - Value to check
- * @returns True if the value is a plain object
+ * A leaf node represents an actual agent configuration with a `model` field,
+ * as opposed to a branch node which contains nested configurations.
+ *
+ * @param value - The object value to check
+ * @returns True if the value has a string `model` property
+ * @private
  */
-function isObject(obj: unknown): obj is Record<string, unknown> {
-  return typeof obj === 'object' && obj !== null && !Array.isArray(obj)
+function isLeafNode(value: Record<string, unknown>): boolean {
+  return 'model' in value && typeof value.model === 'string'
 }
 
 /**
  * Recursively merges model settings from preset into target config.
  *
- * This function traverses the hierarchical structure and updates model/variant
+ * Traverses the hierarchical structure and updates model/variant
  * fields at leaf nodes while preserving all other properties.
  *
- * @param target - The target configuration to update
- * @param preset - The preset containing model values to merge
+ * The merge strategy:
+ * - Leaf nodes (with `model` field): Updates `model` and `variant` while preserving other properties
+ * - Branch nodes: Recursively merges into nested structures
+ * - Non-object values: Skipped
+ *
+ * @param target - The target configuration object to modify (in-place)
+ * @param preset - The hierarchical preset containing model values to apply
+ * @private
  */
 function deepMergeModel(
   target: Record<string, unknown>,
@@ -41,11 +52,9 @@ function deepMergeModel(
 
     const actualValue = target[key]
 
-    if ('model' in value && typeof value.model === 'string') {
-      // Leaf node: update model/variant, preserve other properties
+    if (isLeafNode(value as Record<string, unknown>)) {
       const valueRecord = value as Record<string, unknown>
-      const existing =
-        (actualValue as Record<string, unknown> | undefined) ?? {}
+      const existing = (actualValue as Record<string, unknown>) ?? {}
 
       const merged: Record<string, unknown> = {
         ...existing,
@@ -58,9 +67,7 @@ function deepMergeModel(
 
       target[key] = merged
     } else {
-      // Branch node: recurse
-      const childTarget =
-        (actualValue as Record<string, unknown> | undefined) ?? {}
+      const childTarget = (actualValue as Record<string, unknown>) ?? {}
       target[key] = childTarget
       deepMergeModel(childTarget, value as HierarchicalPreset)
     }
@@ -70,9 +77,14 @@ function deepMergeModel(
 /**
  * Recursively checks if actual configuration differs from expected preset.
  *
- * @param actual - The actual configuration
- * @param expected - The expected preset values
- * @returns True if drift is detected
+ * Drift is detected when:
+ * - Leaf node `model` values differ
+ * - Leaf node `variant` values differ (when variant is defined in preset)
+ *
+ * @param actual - The actual configuration to check
+ * @param expected - The expected preset configuration
+ * @returns True if any model or variant value differs from expected
+ * @private
  */
 function hasDriftRecursive(
   actual: Record<string, unknown>,
@@ -83,8 +95,7 @@ function hasDriftRecursive(
 
     const actualValue = actual[key]
 
-    if ('model' in expectedValue && typeof expectedValue.model === 'string') {
-      // Leaf node with model: compare
+    if (isLeafNode(expectedValue as Record<string, unknown>)) {
       const actualObj = actualValue as Record<string, unknown> | undefined
       if (actualObj?.model !== expectedValue.model) {
         return true
@@ -96,7 +107,6 @@ function hasDriftRecursive(
         return true
       }
     } else {
-      // Branch node: recurse
       if (
         hasDriftRecursive(
           (actualValue || {}) as Record<string, unknown>,
@@ -114,9 +124,14 @@ function hasDriftRecursive(
 /**
  * Recursively formats hierarchical configuration as a tree string.
  *
+ * Output format:
+ * - Branch nodes: Display as `key:` with nested children indented
+ * - Leaf nodes: Display as `key: model (variant) [otherProps]`
+ *
  * @param preset - The hierarchical preset to format
- * @param indent - Current indentation level
- * @returns Formatted multi-line string
+ * @param indent - Indentation string for current depth (default: '  ')
+ * @returns Multi-line string representation of the configuration tree
+ * @private
  */
 function formatHierarchicalTree(
   preset: HierarchicalPreset,
@@ -125,23 +140,21 @@ function formatHierarchicalTree(
   const lines: string[] = []
 
   for (const [key, value] of Object.entries(preset)) {
-    if (isObject(value)) {
-      if ('model' in value && typeof value.model === 'string') {
-        // Leaf node
-        const variant = value.variant ? ` (${value.variant})` : ''
-        const otherProps = Object.keys(value)
-          .filter((k) => k !== 'model' && k !== 'variant')
-          .map((k) => `${k}: ${JSON.stringify(value[k])}`)
-          .join(', ')
-        const extra = otherProps ? ` [${otherProps}]` : ''
-        lines.push(`${indent}${key}: ${value.model}${variant}${extra}`)
-      } else {
-        // Branch node
-        lines.push(`${indent}${key}:`)
-        lines.push(
-          formatHierarchicalTree(value as HierarchicalPreset, `${indent}  `)
-        )
-      }
+    if (!isObject(value)) continue
+
+    if (isLeafNode(value as Record<string, unknown>)) {
+      const variant = value.variant ? ` (${value.variant})` : ''
+      const otherProps = Object.keys(value)
+        .filter((k) => k !== 'model' && k !== 'variant')
+        .map((k) => `${k}: ${JSON.stringify(value[k])}`)
+        .join(', ')
+      const extra = otherProps ? ` [${otherProps}]` : ''
+      lines.push(`${indent}${key}: ${value.model}${variant}${extra}`)
+    } else {
+      lines.push(`${indent}${key}:`)
+      lines.push(
+        formatHierarchicalTree(value as HierarchicalPreset, `${indent}  `)
+      )
     }
   }
 

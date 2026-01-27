@@ -1,94 +1,17 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
 import type { OpencodeClient } from '@opencode-ai/sdk'
 import type {
-  HierarchicalPreset,
   ModePreset,
   ModeSwitcherConfig,
   OhMyOpencodeConfig,
   OpencodeConfig,
 } from '../config/types.ts'
 import { createMockOpencodeClient, sampleConfigs } from '../test-utils/mocks.ts'
-
-/**
- * Type guard to check if a value is a plain object (not null, not array).
- */
-function isObject(obj: unknown): obj is Record<string, unknown> {
-  return typeof obj === 'object' && obj !== null && !Array.isArray(obj)
-}
-
-/**
- * Recursively merges model settings from preset into target config.
- */
-function deepMergeModel(
-  target: Record<string, unknown>,
-  preset: HierarchicalPreset
-): void {
-  for (const [key, value] of Object.entries(preset)) {
-    if (!isObject(value)) continue
-
-    const actualValue = target[key]
-
-    if ('model' in value && typeof value.model === 'string') {
-      const valueRecord = value as Record<string, unknown>
-      const existing =
-        (actualValue as Record<string, unknown> | undefined) ?? {}
-
-      const merged: Record<string, unknown> = {
-        ...existing,
-        model: valueRecord.model,
-      }
-
-      if (valueRecord.variant) {
-        merged.variant = valueRecord.variant
-      }
-
-      target[key] = merged
-    } else {
-      const childTarget =
-        (actualValue as Record<string, unknown> | undefined) ?? {}
-      target[key] = childTarget
-      deepMergeModel(childTarget, value as HierarchicalPreset)
-    }
-  }
-}
-
-/**
- * Recursively checks if actual configuration differs from expected preset.
- */
-function hasDriftRecursive(
-  actual: Record<string, unknown>,
-  expected: HierarchicalPreset
-): boolean {
-  for (const [key, expectedValue] of Object.entries(expected)) {
-    if (!isObject(expectedValue)) continue
-
-    const actualValue = actual[key]
-
-    if ('model' in expectedValue && typeof expectedValue.model === 'string') {
-      const actualObj = actualValue as Record<string, unknown> | undefined
-      if (actualObj?.model !== expectedValue.model) {
-        return true
-      }
-      if (
-        expectedValue.variant &&
-        actualObj?.variant !== expectedValue.variant
-      ) {
-        return true
-      }
-    } else {
-      if (
-        hasDriftRecursive(
-          (actualValue || {}) as Record<string, unknown>,
-          expectedValue as HierarchicalPreset
-        )
-      ) {
-        return true
-      }
-    }
-  }
-
-  return false
-}
+import {
+  deepMergeModel,
+  formatHierarchicalTree,
+  hasDriftRecursive,
+} from '../test-utils/recursive-helpers.ts'
 
 /**
  * Creates a deep copy of the sample plugin config for isolated test use.
@@ -246,43 +169,6 @@ class MockModeManager {
     return `Available modes:\n${modes}`
   }
 
-  /**
-   * Recursively formats hierarchical configuration as a tree string.
-   */
-  private formatHierarchicalTree(
-    preset: HierarchicalPreset,
-    indent = '  '
-  ): string {
-    const lines: string[] = []
-
-    for (const [key, value] of Object.entries(preset)) {
-      if (isObject(value)) {
-        if ('model' in value && typeof value.model === 'string') {
-          const variant = value.variant ? ` (${value.variant})` : ''
-          const otherProps = Object.keys(value)
-            .filter((k) => k !== 'model' && k !== 'variant')
-            .map(
-              (k) =>
-                `${k}: ${JSON.stringify((value as Record<string, unknown>)[k])}`
-            )
-            .join(', ')
-          const extra = otherProps ? ` [${otherProps}]` : ''
-          lines.push(`${indent}${key}: ${value.model}${variant}${extra}`)
-        } else {
-          lines.push(`${indent}${key}:`)
-          lines.push(
-            this.formatHierarchicalTree(
-              value as HierarchicalPreset,
-              `${indent}  `
-            )
-          )
-        }
-      }
-    }
-
-    return lines.join('\n')
-  }
-
   async getStatus(): Promise<string> {
     const config = await this.ensureConfig()
     const currentMode = config.currentMode
@@ -296,10 +182,8 @@ class MockModeManager {
       ? `Global model: ${preset.model}`
       : 'Global model: (not set)'
 
-    const opencodeTree = this.formatHierarchicalTree(preset.opencode)
-    const ohMyOpencodeTree = this.formatHierarchicalTree(
-      preset['oh-my-opencode']
-    )
+    const opencodeTree = formatHierarchicalTree(preset.opencode)
+    const ohMyOpencodeTree = formatHierarchicalTree(preset['oh-my-opencode'])
 
     return [
       `Current mode: ${currentMode}`,

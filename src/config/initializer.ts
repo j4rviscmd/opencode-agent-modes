@@ -1,3 +1,4 @@
+import { isObject } from './guards.ts'
 import {
   loadOhMyOpencodeConfig,
   loadOpencodeConfig,
@@ -11,16 +12,6 @@ import type {
   ModeSwitcherConfig,
 } from './types.ts'
 import { DEFAULT_ECONOMY_MODEL } from './types.ts'
-
-/**
- * Type guard to check if a value is a plain object (not null, not array).
- *
- * @param obj - Value to check
- * @returns True if the value is a plain object
- */
-function isObject(obj: unknown): obj is Record<string, unknown> {
-  return typeof obj === 'object' && obj !== null && !Array.isArray(obj)
-}
 
 /**
  * Recursively applies the economy model to all agent configurations.
