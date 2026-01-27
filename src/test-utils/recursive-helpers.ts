@@ -110,15 +110,13 @@ export function hasDriftRecursive(
       ) {
         return true
       }
-    } else {
-      if (
-        hasDriftRecursive(
-          (actualValue || {}) as Record<string, unknown>,
-          expectedValue as HierarchicalPreset
-        )
-      ) {
-        return true
-      }
+    } else if (
+      hasDriftRecursive(
+        (actualValue || {}) as Record<string, unknown>,
+        expectedValue as HierarchicalPreset
+      )
+    ) {
+      return true
     }
   }
 

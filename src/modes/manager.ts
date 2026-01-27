@@ -106,15 +106,13 @@ function hasDriftRecursive(
       ) {
         return true
       }
-    } else {
-      if (
-        hasDriftRecursive(
-          (actualValue || {}) as Record<string, unknown>,
-          expectedValue as HierarchicalPreset
-        )
-      ) {
-        return true
-      }
+    } else if (
+      hasDriftRecursive(
+        (actualValue || {}) as Record<string, unknown>,
+        expectedValue as HierarchicalPreset
+      )
+    ) {
+      return true
     }
   }
 
@@ -297,35 +295,36 @@ export class ModeManager {
     const opencodeConfig = await loadOpencodeConfig()
     const ohMyConfig = await loadOhMyOpencodeConfig()
 
+    // Early return if no configs to check (no drift if nothing exists)
+    if (!opencodeConfig && !ohMyConfig) {
+      return false
+    }
+
     // Check global model in opencode.json
-    if (preset.model && opencodeConfig) {
-      if (opencodeConfig.model !== preset.model) {
-        return true
-      }
+    if (preset.model && opencodeConfig?.model !== preset.model) {
+      return true
     }
 
     // Check opencode agents: recursively check
-    if (opencodeConfig?.agent) {
-      if (
-        hasDriftRecursive(
-          opencodeConfig.agent as Record<string, unknown>,
-          preset.opencode
-        )
-      ) {
-        return true
-      }
+    if (
+      opencodeConfig?.agent &&
+      hasDriftRecursive(
+        opencodeConfig.agent as Record<string, unknown>,
+        preset.opencode
+      )
+    ) {
+      return true
     }
 
     // Check oh-my-opencode: recursively check
-    if (ohMyConfig) {
-      if (
-        hasDriftRecursive(
-          ohMyConfig as Record<string, unknown>,
-          preset['oh-my-opencode']
-        )
-      ) {
-        return true
-      }
+    if (
+      ohMyConfig &&
+      hasDriftRecursive(
+        ohMyConfig as Record<string, unknown>,
+        preset['oh-my-opencode']
+      )
+    ) {
+      return true
     }
 
     return false
@@ -514,9 +513,9 @@ export class ModeManager {
     await savePluginConfig(config)
     results.push('agent-mode-switcher.json: updated')
 
-    // 4. Show toast notification
-    try {
-      await this.client.tui.showToast({
+    // 4. Show toast notification (fire-and-forget - toast might not be available)
+    this.client.tui
+      .showToast({
         body: {
           title: 'Mode Switched',
           message: `Switched to "${modeName}". Restart opencode to apply.`,
@@ -524,9 +523,7 @@ export class ModeManager {
           duration: 5000,
         },
       })
-    } catch {
-      // Toast might not be available in all contexts
-    }
+      .catch(() => {})
 
     return [
       `Switched to ${modeName} mode`,

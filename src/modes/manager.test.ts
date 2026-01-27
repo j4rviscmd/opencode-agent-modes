@@ -102,35 +102,36 @@ class MockModeManager {
   }
 
   private hasConfigDrift(preset: ModePreset): boolean {
+    // Early return if no configs to check (no drift if nothing exists)
+    if (!this.opencodeConfig && !this.ohMyConfig) {
+      return false
+    }
+
     // Check global model
-    if (preset.model && this.opencodeConfig) {
-      if (this.opencodeConfig.model !== preset.model) {
-        return true
-      }
+    if (preset.model && this.opencodeConfig?.model !== preset.model) {
+      return true
     }
 
     // Check opencode: recursively
-    if (this.opencodeConfig?.agent) {
-      if (
-        hasDriftRecursive(
-          this.opencodeConfig.agent as Record<string, unknown>,
-          preset.opencode
-        )
-      ) {
-        return true
-      }
+    if (
+      this.opencodeConfig?.agent &&
+      hasDriftRecursive(
+        this.opencodeConfig.agent as Record<string, unknown>,
+        preset.opencode
+      )
+    ) {
+      return true
     }
 
     // Check oh-my-opencode: recursively
-    if (this.ohMyConfig) {
-      if (
-        hasDriftRecursive(
-          this.ohMyConfig as Record<string, unknown>,
-          preset['oh-my-opencode']
-        )
-      ) {
-        return true
-      }
+    if (
+      this.ohMyConfig &&
+      hasDriftRecursive(
+        this.ohMyConfig as Record<string, unknown>,
+        preset['oh-my-opencode']
+      )
+    ) {
+      return true
     }
 
     return false
