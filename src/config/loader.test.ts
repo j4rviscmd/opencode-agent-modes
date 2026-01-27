@@ -578,9 +578,12 @@ describe('loader', () => {
         expect(content).toContain('// Model for review tasks')
 
         // Verify values are updated
-        const parsed = parseJsonc(content) as OhMyOpencodeConfig
-        expect(parsed.agents?.coder?.model).toBe('opencode/glm-4.7-free')
-        expect(parsed.agents?.reviewer?.model).toBe('opencode/glm-4.7-free')
+        const parsed = parseJsonc(content) as Record<string, unknown>
+        const agents = parsed.agents as Record<string, unknown> | undefined
+        const coder = agents?.coder as Record<string, unknown> | undefined
+        const reviewer = agents?.reviewer as Record<string, unknown> | undefined
+        expect(coder?.model).toBe('opencode/glm-4.7-free')
+        expect(reviewer?.model).toBe('opencode/glm-4.7-free')
       })
 
       test('integration: setContentCache + saveJsonFile preserves comments', async () => {

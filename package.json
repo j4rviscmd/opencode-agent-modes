@@ -1,6 +1,6 @@
 {
   "name": "opencode-agent-modes",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "OpenCode plugin to switch agent modes between performance and economy presets",
   "module": "src/index.ts",
   "main": "dist/index.js",
