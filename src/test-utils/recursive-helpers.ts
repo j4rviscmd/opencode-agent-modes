@@ -23,7 +23,7 @@ function isLeafNode(
  * testing purposes without exposing internal implementation.
  *
  * The merge strategy:
- * - Leaf nodes (with `model` field): Updates `model` and `variant` while preserving other properties
+ * - Leaf nodes (with `model` field): Merges all preset properties while preserving existing ones
  * - Branch nodes: Recursively merges into nested structures
  * - Non-object values: Skipped
  *
@@ -33,9 +33,9 @@ function isLeafNode(
  * @example
  * ```typescript
  * const target = { agent: { build: { model: 'old', temp: 0.5 } } };
- * const preset = { agent: { build: { model: 'new' } } };
+ * const preset = { agent: { build: { model: 'new', color: 'blue' } } };
  * deepMergeModel(target, preset);
- * // target.agent.build is now { model: 'new', temp: 0.5 }
+ * // target.agent.build is now { model: 'new', temp: 0.5, color: 'blue' }
  * ```
  */
 export function deepMergeModel(
@@ -51,13 +51,11 @@ export function deepMergeModel(
       const valueRecord = value as Record<string, unknown>
       const existing = (actualValue as Record<string, unknown>) ?? {}
 
+      // Merge all preset properties (model, variant, and any future properties)
+      // Existing properties are preserved, preset properties override/add them
       const merged: Record<string, unknown> = {
         ...existing,
-        model: valueRecord.model,
-      }
-
-      if (valueRecord.variant) {
-        merged.variant = valueRecord.variant
+        ...valueRecord,
       }
 
       target[key] = merged
@@ -75,13 +73,12 @@ export function deepMergeModel(
  * This is a test utility that mirrors the logic in manager.ts for
  * testing purposes without exposing internal implementation.
  *
- * Drift is detected when:
- * - Leaf node `model` values differ
- * - Leaf node `variant` values differ (when variant is defined in preset)
+ * Drift is detected when any preset property differs from the actual config.
+ * This includes model, variant, and any future properties.
  *
  * @param actual - The actual configuration to check
  * @param expected - The expected preset configuration
- * @returns True if any model or variant value differs from expected
+ * @returns True if any preset property differs from expected
  *
  * @example
  * ```typescript
@@ -101,14 +98,18 @@ export function hasDriftRecursive(
 
     if (isLeafNode(expectedValue as Record<string, unknown>)) {
       const actualObj = actualValue as Record<string, unknown> | undefined
-      if (actualObj?.model !== expectedValue.model) {
+      if (!actualObj) {
+        // Actual config missing this leaf node - drift detected
         return true
       }
-      if (
-        expectedValue.variant &&
-        actualObj?.variant !== expectedValue.variant
-      ) {
-        return true
+
+      // Check all properties in the expected preset
+      for (const [propKey, expectedPropValue] of Object.entries(
+        expectedValue as Record<string, unknown>
+      )) {
+        if (actualObj[propKey] !== expectedPropValue) {
+          return true
+        }
       }
     } else if (
       hasDriftRecursive(

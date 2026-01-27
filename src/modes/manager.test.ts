@@ -53,6 +53,10 @@ class MockModeManager {
     this.opencodeConfig = config
   }
 
+  getOpencodeConfig(): OpencodeConfig | null {
+    return this.opencodeConfig
+  }
+
   setOhMyConfig(config: OhMyOpencodeConfig): void {
     this.ohMyConfig = config
   }
@@ -585,6 +589,65 @@ describe('ModeManager', () => {
 
       await manager.initialize()
 
+      expect(manager.lastDriftToast).not.toBeNull()
+    })
+
+    test('merges new properties from preset into config', async () => {
+      const config = clonePluginConfig()
+      config.currentMode = 'performance'
+      // Add new properties to preset
+      const perfPreset = config.presets.performance
+      if (perfPreset) {
+        perfPreset.opencode = {
+          build: { model: 'anthropic/claude-sonnet-4', color: 'blue', icon: 'star' },
+          plan: { model: 'anthropic/claude-sonnet-4' },
+        }
+      }
+      manager.setConfig(config)
+      manager.setOpencodeConfig({
+        model: 'anthropic/claude-sonnet-4',
+        agent: {
+          build: { model: 'anthropic/claude-sonnet-4', temp: 0.5 },
+          plan: { model: 'anthropic/claude-sonnet-4' },
+        },
+      })
+
+      await manager.initialize()
+
+      // After merge, build should have both old (temp) and new (color, icon) properties
+      const agentConfig = manager.getOpencodeConfig()?.agent as Record<
+        string,
+        unknown
+      >
+      const buildConfig = agentConfig?.build as Record<string, unknown> | undefined
+      expect(buildConfig).toBeDefined()
+      expect(buildConfig?.model).toBe('anthropic/claude-sonnet-4')
+      expect(buildConfig?.temp).toBe(0.5) // Existing property preserved
+      expect(buildConfig?.color).toBe('blue') // New property from preset added
+      expect(buildConfig?.icon).toBe('star') // New property from preset added
+    })
+
+    test('detects drift on new preset properties', async () => {
+      const config = clonePluginConfig()
+      config.currentMode = 'performance'
+      // Add new property to preset
+      const perfPreset = config.presets.performance
+      if (perfPreset) {
+        perfPreset.opencode = {
+          build: { model: 'anthropic/claude-sonnet-4', color: 'blue' },
+        }
+      }
+      manager.setConfig(config)
+      manager.setOpencodeConfig({
+        model: 'anthropic/claude-sonnet-4',
+        agent: {
+          build: { model: 'anthropic/claude-sonnet-4', color: 'red' }, // Mismatch
+        },
+      })
+
+      await manager.initialize()
+
+      // Should detect drift and apply preset
       expect(manager.lastDriftToast).not.toBeNull()
     })
   })
