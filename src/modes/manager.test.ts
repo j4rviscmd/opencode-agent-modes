@@ -599,7 +599,11 @@ describe('ModeManager', () => {
       const perfPreset = config.presets.performance
       if (perfPreset) {
         perfPreset.opencode = {
-          build: { model: 'anthropic/claude-sonnet-4', color: 'blue', icon: 'star' },
+          build: {
+            model: 'anthropic/claude-sonnet-4',
+            color: 'blue',
+            icon: 'star',
+          },
           plan: { model: 'anthropic/claude-sonnet-4' },
         }
       }
@@ -619,7 +623,9 @@ describe('ModeManager', () => {
         string,
         unknown
       >
-      const buildConfig = agentConfig?.build as Record<string, unknown> | undefined
+      const buildConfig = agentConfig?.build as
+        | Record<string, unknown>
+        | undefined
       expect(buildConfig).toBeDefined()
       expect(buildConfig?.model).toBe('anthropic/claude-sonnet-4')
       expect(buildConfig?.temp).toBe(0.5) // Existing property preserved
