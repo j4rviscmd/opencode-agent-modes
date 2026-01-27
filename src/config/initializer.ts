@@ -5,68 +5,88 @@ import {
   pluginConfigExists,
   savePluginConfig,
 } from './loader.ts'
-import type { AgentPreset, ModePreset, ModeSwitcherConfig } from './types.ts'
+import type {
+  HierarchicalPreset,
+  ModePreset,
+  ModeSwitcherConfig,
+} from './types.ts'
 import { DEFAULT_ECONOMY_MODEL } from './types.ts'
 
 /**
- * Default opencode agent names.
+ * Type guard to check if a value is a plain object (not null, not array).
  *
- * These are the standard agents used by OpenCode for various tasks.
- *
- * @constant
+ * @param obj - Value to check
+ * @returns True if the value is a plain object
  */
-const OPENCODE_AGENTS = [
-  'build',
-  'plan',
-  'summary',
-  'compaction',
-  'title',
-  'explore',
-  'general',
-] as const
+function isObject(obj: unknown): obj is Record<string, unknown> {
+  return typeof obj === 'object' && obj !== null && !Array.isArray(obj)
+}
+
+/**
+ * Recursively applies the economy model to all agent configurations.
+ *
+ * This function traverses the hierarchical configuration structure and
+ * updates any object with a `model` field to use the economy model.
+ * Other properties are preserved.
+ *
+ * @param config - The configuration to update
+ * @param economyModel - The economy model string to apply
+ * @returns A new configuration with economy models applied
+ */
+function applyEconomyModel(
+  config: HierarchicalPreset,
+  economyModel: string
+): HierarchicalPreset {
+  const result: HierarchicalPreset = {}
+
+  for (const [key, value] of Object.entries(config)) {
+    if (isObject(value)) {
+      if ('model' in value) {
+        // Leaf node with model field: update model, preserve other properties
+        result[key] = {
+          ...value,
+          model: economyModel,
+        }
+      } else {
+        // Branch node: recurse
+        result[key] = applyEconomyModel(
+          value as HierarchicalPreset,
+          economyModel
+        )
+      }
+    } else {
+      result[key] = value
+    }
+  }
+
+  return result
+}
 
 /**
  * Builds a performance preset from existing OpenCode configurations.
  *
- * This function scans the current `opencode.json` and `oh-my-opencode.json`
- * files to extract the currently configured models for each agent. These
- * models are saved as the "performance" preset, preserving the user's
- * high-performance model choices.
+ * This function reads the current `opencode.json` and `oh-my-opencode.json`
+ * files and preserves their entire structure as-is. The hierarchical
+ * structure (agent, agents, categories, etc.) is maintained exactly.
  *
  * @returns Promise resolving to a ModePreset with performance-oriented models
  * @example
  * ```typescript
  * const preset = await buildPerformancePreset();
- * console.log(preset.opencode.build.model); // "anthropic/claude-sonnet-4"
+ * console.log(preset.opencode); // Full hierarchical structure
  * ```
  */
 async function buildPerformancePreset(): Promise<ModePreset> {
   const opencodeConfig = await loadOpencodeConfig()
   const ohMyOpencodeConfig = await loadOhMyOpencodeConfig()
 
-  const opencodePreset: Record<string, AgentPreset> = {}
-  const ohMyOpencodePreset: Record<string, AgentPreset> = {}
+  // opencode: preserve the entire agent structure as-is
+  const opencodePreset: HierarchicalPreset =
+    (opencodeConfig?.agent as HierarchicalPreset) || {}
 
-  // Extract opencode agent settings
-  if (opencodeConfig?.agent) {
-    for (const agentName of OPENCODE_AGENTS) {
-      const agentConfig = opencodeConfig.agent[agentName]
-      if (agentConfig?.model) {
-        opencodePreset[agentName] = { model: agentConfig.model }
-      }
-    }
-  }
-
-  // Extract oh-my-opencode agent settings
-  if (ohMyOpencodeConfig?.agents) {
-    for (const [agentName, agentConfig] of Object.entries(
-      ohMyOpencodeConfig.agents
-    )) {
-      if (agentConfig?.model) {
-        ohMyOpencodePreset[agentName] = { model: agentConfig.model }
-      }
-    }
-  }
+  // oh-my-opencode: preserve the entire structure as-is
+  const ohMyOpencodePreset: HierarchicalPreset =
+    (ohMyOpencodeConfig as HierarchicalPreset) || {}
 
   // Extract global model from opencode.json if present
   const globalModel = opencodeConfig?.model
@@ -84,8 +104,8 @@ async function buildPerformancePreset(): Promise<ModePreset> {
  *
  * This function creates a cost-efficient preset where all agents
  * (both OpenCode and oh-my-opencode) are configured to use the
- * `opencode/glm-4.7-free` model. This provides a budget-friendly
- * alternative to performance mode for routine tasks.
+ * `opencode/glm-4.7-free` model. The hierarchical structure is
+ * preserved while model values are updated recursively.
  *
  * @returns Promise resolving to a ModePreset with economy-oriented models
  * @example
@@ -98,27 +118,17 @@ async function buildEconomyPreset(): Promise<ModePreset> {
   const opencodeConfig = await loadOpencodeConfig()
   const ohMyOpencodeConfig = await loadOhMyOpencodeConfig()
 
-  const opencodePreset: Record<string, AgentPreset> = {}
-  const ohMyOpencodePreset: Record<string, AgentPreset> = {}
+  // opencode: preserve structure, update models recursively
+  const opencodePreset = applyEconomyModel(
+    (opencodeConfig?.agent as HierarchicalPreset) || {},
+    DEFAULT_ECONOMY_MODEL
+  )
 
-  // Set economy model for all opencode agents
-  if (opencodeConfig?.agent) {
-    for (const agentName of Object.keys(opencodeConfig.agent)) {
-      opencodePreset[agentName] = { model: DEFAULT_ECONOMY_MODEL }
-    }
-  } else {
-    // Use default agent list if no config exists
-    for (const agentName of OPENCODE_AGENTS) {
-      opencodePreset[agentName] = { model: DEFAULT_ECONOMY_MODEL }
-    }
-  }
-
-  // Set economy model for all oh-my-opencode agents
-  if (ohMyOpencodeConfig?.agents) {
-    for (const agentName of Object.keys(ohMyOpencodeConfig.agents)) {
-      ohMyOpencodePreset[agentName] = { model: DEFAULT_ECONOMY_MODEL }
-    }
-  }
+  // oh-my-opencode: preserve structure, update models recursively
+  const ohMyOpencodePreset = applyEconomyModel(
+    (ohMyOpencodeConfig as HierarchicalPreset) || {},
+    DEFAULT_ECONOMY_MODEL
+  )
 
   return {
     description: 'Cost-efficient free model for routine tasks',

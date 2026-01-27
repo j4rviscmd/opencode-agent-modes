@@ -128,43 +128,85 @@ describe('initializer', () => {
         description: 'Cost-efficient free model for routine tasks',
         model: 'opencode/glm-4.7-free',
         opencode: {
-          build: { model: 'opencode/glm-4.7-free' },
-          plan: { model: 'opencode/glm-4.7-free' },
+          agent: {
+            build: { model: 'opencode/glm-4.7-free' },
+            plan: { model: 'opencode/glm-4.7-free' },
+          },
         },
-        'oh-my-opencode': {},
+        'oh-my-opencode': {
+          agents: {
+            sisyphus: { model: 'opencode/glm-4.7-free' },
+          },
+        },
       }
 
       expect(economyPreset.model).toBe('opencode/glm-4.7-free')
-      expect(economyPreset.opencode.build?.model).toBe('opencode/glm-4.7-free')
+      // Check hierarchical structure
+      const opencodeAgent = economyPreset.opencode.agent as Record<
+        string,
+        unknown
+      >
+      const buildConfig = opencodeAgent.build as Record<string, unknown>
+      expect(buildConfig.model).toBe('opencode/glm-4.7-free')
+
+      const ohMyAgents = economyPreset['oh-my-opencode'].agents as Record<
+        string,
+        unknown
+      >
+      const sisyphusConfig = ohMyAgents.sisyphus as Record<string, unknown>
+      expect(sisyphusConfig.model).toBe('opencode/glm-4.7-free')
     })
 
-    test('performance preset captures existing models', () => {
-      // Simulate building performance preset from existing config
+    test('performance preset captures existing models with hierarchy', () => {
+      // Simulate building performance preset from existing config with hierarchy
       const existingOpencodeConfig = {
         model: 'anthropic/claude-sonnet-4',
         agent: {
-          build: { model: 'anthropic/claude-sonnet-4' },
+          build: { model: 'anthropic/claude-sonnet-4', piyo: 'fuga' },
           plan: { model: 'anthropic/claude-haiku' },
+        },
+      }
+
+      const existingOhMyConfig = {
+        agents: {
+          sisyphus: {
+            model: 'github-copilot/claude-4.5',
+            variant: 'high',
+            abc: 123,
+          },
+          oracle: { model: 'github-copilot/gpt-5.2' },
+        },
+        categories: {
+          quick: { model: 'github-copilot/haiku-4.5' },
         },
       }
 
       const performancePreset: ModePreset = {
         description: 'High-performance models for complex tasks',
         model: existingOpencodeConfig.model,
-        opencode: {
-          build: { model: existingOpencodeConfig.agent.build.model },
-          plan: { model: existingOpencodeConfig.agent.plan.model },
-        },
-        'oh-my-opencode': {},
+        opencode: existingOpencodeConfig.agent as Record<string, unknown>,
+        'oh-my-opencode': existingOhMyConfig as Record<string, unknown>,
       }
 
       expect(performancePreset.model).toBe('anthropic/claude-sonnet-4')
-      expect(performancePreset.opencode.build?.model).toBe(
-        'anthropic/claude-sonnet-4'
-      )
-      expect(performancePreset.opencode.plan?.model).toBe(
-        'anthropic/claude-haiku'
-      )
+
+      // Check opencode hierarchy is preserved (opencode IS the agent hierarchy)
+      const buildConfig = performancePreset.opencode.build as Record<
+        string,
+        unknown
+      >
+      expect(buildConfig.model).toBe('anthropic/claude-sonnet-4')
+      expect(buildConfig.piyo).toBe('fuga') // Other properties preserved
+
+      // Check oh-my-opencode hierarchy is preserved
+      const ohMyAgents = performancePreset['oh-my-opencode'].agents as Record<
+        string,
+        unknown
+      >
+      const sisyphusConfig = ohMyAgents.sisyphus as Record<string, unknown>
+      expect(sisyphusConfig.model).toBe('github-copilot/claude-4.5')
+      expect(sisyphusConfig.variant).toBe('high')
+      expect(sisyphusConfig.abc).toBe(123) // Other properties preserved
     })
 
     test('config file persistence', async () => {

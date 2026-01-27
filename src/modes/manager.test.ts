@@ -1,12 +1,94 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
 import type { OpencodeClient } from '@opencode-ai/sdk'
 import type {
+  HierarchicalPreset,
   ModePreset,
   ModeSwitcherConfig,
   OhMyOpencodeConfig,
   OpencodeConfig,
 } from '../config/types.ts'
 import { createMockOpencodeClient, sampleConfigs } from '../test-utils/mocks.ts'
+
+/**
+ * Type guard to check if a value is a plain object (not null, not array).
+ */
+function isObject(obj: unknown): obj is Record<string, unknown> {
+  return typeof obj === 'object' && obj !== null && !Array.isArray(obj)
+}
+
+/**
+ * Recursively merges model settings from preset into target config.
+ */
+function deepMergeModel(
+  target: Record<string, unknown>,
+  preset: HierarchicalPreset
+): void {
+  for (const [key, value] of Object.entries(preset)) {
+    if (!isObject(value)) continue
+
+    const actualValue = target[key]
+
+    if ('model' in value && typeof value.model === 'string') {
+      const valueRecord = value as Record<string, unknown>
+      const existing =
+        (actualValue as Record<string, unknown> | undefined) ?? {}
+
+      const merged: Record<string, unknown> = {
+        ...existing,
+        model: valueRecord.model,
+      }
+
+      if (valueRecord.variant) {
+        merged.variant = valueRecord.variant
+      }
+
+      target[key] = merged
+    } else {
+      const childTarget =
+        (actualValue as Record<string, unknown> | undefined) ?? {}
+      target[key] = childTarget
+      deepMergeModel(childTarget, value as HierarchicalPreset)
+    }
+  }
+}
+
+/**
+ * Recursively checks if actual configuration differs from expected preset.
+ */
+function hasDriftRecursive(
+  actual: Record<string, unknown>,
+  expected: HierarchicalPreset
+): boolean {
+  for (const [key, expectedValue] of Object.entries(expected)) {
+    if (!isObject(expectedValue)) continue
+
+    const actualValue = actual[key]
+
+    if ('model' in expectedValue && typeof expectedValue.model === 'string') {
+      const actualObj = actualValue as Record<string, unknown> | undefined
+      if (actualObj?.model !== expectedValue.model) {
+        return true
+      }
+      if (
+        expectedValue.variant &&
+        actualObj?.variant !== expectedValue.variant
+      ) {
+        return true
+      }
+    } else {
+      if (
+        hasDriftRecursive(
+          (actualValue || {}) as Record<string, unknown>,
+          expectedValue as HierarchicalPreset
+        )
+      ) {
+        return true
+      }
+    }
+  }
+
+  return false
+}
 
 /**
  * Creates a deep copy of the sample plugin config for isolated test use.
@@ -74,25 +156,23 @@ class MockModeManager {
       return
     }
 
-    // Apply preset to in-memory configs
+    // Apply preset to in-memory configs using recursive merge
     if (this.opencodeConfig) {
       if (preset.model) {
         this.opencodeConfig.model = preset.model
       }
       this.opencodeConfig.agent = this.opencodeConfig.agent || {}
-      for (const [name, p] of Object.entries(preset.opencode)) {
-        this.opencodeConfig.agent[name] = {
-          ...this.opencodeConfig.agent[name],
-          model: p.model,
-        }
-      }
+      deepMergeModel(
+        this.opencodeConfig.agent as Record<string, unknown>,
+        preset.opencode
+      )
     }
 
     if (this.ohMyConfig) {
-      this.ohMyConfig.agents = this.ohMyConfig.agents || {}
-      for (const [name, p] of Object.entries(preset['oh-my-opencode'])) {
-        this.ohMyConfig.agents[name] = { model: p.model }
-      }
+      deepMergeModel(
+        this.ohMyConfig as Record<string, unknown>,
+        preset['oh-my-opencode']
+      )
     }
 
     this.lastDriftToast = `Applied "${this.config.currentMode}" mode. Restart opencode to take effect.`
@@ -106,23 +186,27 @@ class MockModeManager {
       }
     }
 
-    // Check opencode agent models
+    // Check opencode: recursively
     if (this.opencodeConfig?.agent) {
-      for (const [name, p] of Object.entries(preset.opencode)) {
-        const actual = this.opencodeConfig.agent[name]
-        if (actual?.model !== p.model) {
-          return true
-        }
+      if (
+        hasDriftRecursive(
+          this.opencodeConfig.agent as Record<string, unknown>,
+          preset.opencode
+        )
+      ) {
+        return true
       }
     }
 
-    // Check oh-my-opencode agent models
-    if (this.ohMyConfig?.agents) {
-      for (const [name, p] of Object.entries(preset['oh-my-opencode'])) {
-        const actual = this.ohMyConfig.agents[name]
-        if (actual?.model !== p.model) {
-          return true
-        }
+    // Check oh-my-opencode: recursively
+    if (this.ohMyConfig) {
+      if (
+        hasDriftRecursive(
+          this.ohMyConfig as Record<string, unknown>,
+          preset['oh-my-opencode']
+        )
+      ) {
+        return true
       }
     }
 
@@ -162,6 +246,43 @@ class MockModeManager {
     return `Available modes:\n${modes}`
   }
 
+  /**
+   * Recursively formats hierarchical configuration as a tree string.
+   */
+  private formatHierarchicalTree(
+    preset: HierarchicalPreset,
+    indent = '  '
+  ): string {
+    const lines: string[] = []
+
+    for (const [key, value] of Object.entries(preset)) {
+      if (isObject(value)) {
+        if ('model' in value && typeof value.model === 'string') {
+          const variant = value.variant ? ` (${value.variant})` : ''
+          const otherProps = Object.keys(value)
+            .filter((k) => k !== 'model' && k !== 'variant')
+            .map(
+              (k) =>
+                `${k}: ${JSON.stringify((value as Record<string, unknown>)[k])}`
+            )
+            .join(', ')
+          const extra = otherProps ? ` [${otherProps}]` : ''
+          lines.push(`${indent}${key}: ${value.model}${variant}${extra}`)
+        } else {
+          lines.push(`${indent}${key}:`)
+          lines.push(
+            this.formatHierarchicalTree(
+              value as HierarchicalPreset,
+              `${indent}  `
+            )
+          )
+        }
+      }
+    }
+
+    return lines.join('\n')
+  }
+
   async getStatus(): Promise<string> {
     const config = await this.ensureConfig()
     const currentMode = config.currentMode
@@ -175,24 +296,21 @@ class MockModeManager {
       ? `Global model: ${preset.model}`
       : 'Global model: (not set)'
 
-    const opencodeAgents = Object.entries(preset.opencode)
-      .map(([name, cfg]) => `  - ${name}: ${cfg.model}`)
-      .join('\n')
-
-    const ohMyOpencodeAgents = Object.entries(preset['oh-my-opencode'])
-      .map(([name, cfg]) => `  - ${name}: ${cfg.model}`)
-      .join('\n')
+    const opencodeTree = this.formatHierarchicalTree(preset.opencode)
+    const ohMyOpencodeTree = this.formatHierarchicalTree(
+      preset['oh-my-opencode']
+    )
 
     return [
       `Current mode: ${currentMode}`,
       `Description: ${preset.description}`,
       globalModel,
       '',
-      'OpenCode agents:',
-      opencodeAgents || '  (none configured)',
+      'OpenCode config:',
+      opencodeTree || '  (none configured)',
       '',
-      'Oh-my-opencode agents:',
-      ohMyOpencodeAgents || '  (none configured)',
+      'Oh-my-opencode config:',
+      ohMyOpencodeTree || '  (none configured)',
     ].join('\n')
   }
 
@@ -350,8 +468,8 @@ describe('ModeManager', () => {
       expect(status).toContain('Current mode: performance')
       expect(status).toContain('Description:')
       expect(status).toContain('Global model:')
-      expect(status).toContain('OpenCode agents:')
-      expect(status).toContain('Oh-my-opencode agents:')
+      expect(status).toContain('OpenCode config:')
+      expect(status).toContain('Oh-my-opencode config:')
     })
 
     test('shows preset not found for invalid mode', async () => {
@@ -506,6 +624,8 @@ describe('ModeManager', () => {
       const config = clonePluginConfig()
       config.currentMode = 'economy'
       manager.setConfig(config)
+
+      // Configs must match the economy preset structure
       manager.setOpencodeConfig({
         model: 'opencode/glm-4.7-free',
         agent: {
@@ -513,9 +633,17 @@ describe('ModeManager', () => {
           plan: { model: 'opencode/glm-4.7-free' },
         },
       })
+
+      // Economy preset has agents: sisyphus and oracle under agents section
+      // and categories section. For this test, we'll use a simpler structure.
       manager.setOhMyConfig({
         agents: {
-          coder: { model: 'opencode/glm-4.7-free' },
+          sisyphus: { model: 'opencode/glm-4.7-free' },
+          oracle: { model: 'opencode/glm-4.7-free' },
+        },
+        categories: {
+          'visual-engineering': { model: 'opencode/glm-4.7-free' },
+          quick: { model: 'opencode/glm-4.7-free' },
         },
       })
 

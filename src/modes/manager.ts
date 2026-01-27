@@ -7,7 +7,146 @@ import {
   saveOpencodeConfig,
   savePluginConfig,
 } from '../config/loader.ts'
-import type { ModePreset, ModeSwitcherConfig } from '../config/types.ts'
+import type {
+  HierarchicalPreset,
+  ModePreset,
+  ModeSwitcherConfig,
+} from '../config/types.ts'
+
+/**
+ * Type guard to check if a value is a plain object (not null, not array).
+ *
+ * @param obj - Value to check
+ * @returns True if the value is a plain object
+ */
+function isObject(obj: unknown): obj is Record<string, unknown> {
+  return typeof obj === 'object' && obj !== null && !Array.isArray(obj)
+}
+
+/**
+ * Recursively merges model settings from preset into target config.
+ *
+ * This function traverses the hierarchical structure and updates model/variant
+ * fields at leaf nodes while preserving all other properties.
+ *
+ * @param target - The target configuration to update
+ * @param preset - The preset containing model values to merge
+ */
+function deepMergeModel(
+  target: Record<string, unknown>,
+  preset: HierarchicalPreset
+): void {
+  for (const [key, value] of Object.entries(preset)) {
+    if (!isObject(value)) continue
+
+    const actualValue = target[key]
+
+    if ('model' in value && typeof value.model === 'string') {
+      // Leaf node: update model/variant, preserve other properties
+      const valueRecord = value as Record<string, unknown>
+      const existing =
+        (actualValue as Record<string, unknown> | undefined) ?? {}
+
+      const merged: Record<string, unknown> = {
+        ...existing,
+        model: valueRecord.model,
+      }
+
+      if (valueRecord.variant) {
+        merged.variant = valueRecord.variant
+      }
+
+      target[key] = merged
+    } else {
+      // Branch node: recurse
+      const childTarget =
+        (actualValue as Record<string, unknown> | undefined) ?? {}
+      target[key] = childTarget
+      deepMergeModel(childTarget, value as HierarchicalPreset)
+    }
+  }
+}
+
+/**
+ * Recursively checks if actual configuration differs from expected preset.
+ *
+ * @param actual - The actual configuration
+ * @param expected - The expected preset values
+ * @returns True if drift is detected
+ */
+function hasDriftRecursive(
+  actual: Record<string, unknown>,
+  expected: HierarchicalPreset
+): boolean {
+  for (const [key, expectedValue] of Object.entries(expected)) {
+    if (!isObject(expectedValue)) continue
+
+    const actualValue = actual[key]
+
+    if ('model' in expectedValue && typeof expectedValue.model === 'string') {
+      // Leaf node with model: compare
+      const actualObj = actualValue as Record<string, unknown> | undefined
+      if (actualObj?.model !== expectedValue.model) {
+        return true
+      }
+      if (
+        expectedValue.variant &&
+        actualObj?.variant !== expectedValue.variant
+      ) {
+        return true
+      }
+    } else {
+      // Branch node: recurse
+      if (
+        hasDriftRecursive(
+          (actualValue || {}) as Record<string, unknown>,
+          expectedValue as HierarchicalPreset
+        )
+      ) {
+        return true
+      }
+    }
+  }
+
+  return false
+}
+
+/**
+ * Recursively formats hierarchical configuration as a tree string.
+ *
+ * @param preset - The hierarchical preset to format
+ * @param indent - Current indentation level
+ * @returns Formatted multi-line string
+ */
+function formatHierarchicalTree(
+  preset: HierarchicalPreset,
+  indent = '  '
+): string {
+  const lines: string[] = []
+
+  for (const [key, value] of Object.entries(preset)) {
+    if (isObject(value)) {
+      if ('model' in value && typeof value.model === 'string') {
+        // Leaf node
+        const variant = value.variant ? ` (${value.variant})` : ''
+        const otherProps = Object.keys(value)
+          .filter((k) => k !== 'model' && k !== 'variant')
+          .map((k) => `${k}: ${JSON.stringify(value[k])}`)
+          .join(', ')
+        const extra = otherProps ? ` [${otherProps}]` : ''
+        lines.push(`${indent}${key}: ${value.model}${variant}${extra}`)
+      } else {
+        // Branch node
+        lines.push(`${indent}${key}:`)
+        lines.push(
+          formatHierarchicalTree(value as HierarchicalPreset, `${indent}  `)
+        )
+      }
+    }
+  }
+
+  return lines.join('\n')
+}
 
 /**
  * Manages agent mode switching between different presets.
@@ -134,7 +273,7 @@ export class ModeManager {
    * Compares a mode preset against the actual opencode.json and
    * oh-my-opencode.json files to detect configuration drift.
    *
-   * Checks global model and per-agent model values. Returns true
+   * Checks global model and per-agent model values recursively. Returns true
    * if any expected value differs from the actual file content.
    *
    * @param preset - The mode preset to compare against
@@ -152,25 +291,27 @@ export class ModeManager {
       }
     }
 
-    // Check opencode agent models
+    // Check opencode agents: recursively check
     if (opencodeConfig?.agent) {
-      for (const [agentName, agentPreset] of Object.entries(preset.opencode)) {
-        const actual = opencodeConfig.agent[agentName]
-        if (actual?.model !== agentPreset.model) {
-          return true
-        }
+      if (
+        hasDriftRecursive(
+          opencodeConfig.agent as Record<string, unknown>,
+          preset.opencode
+        )
+      ) {
+        return true
       }
     }
 
-    // Check oh-my-opencode agent models
-    if (ohMyConfig?.agents) {
-      for (const [agentName, agentPreset] of Object.entries(
-        preset['oh-my-opencode']
-      )) {
-        const actual = ohMyConfig.agents[agentName]
-        if (actual?.model !== agentPreset.model) {
-          return true
-        }
+    // Check oh-my-opencode: recursively check
+    if (ohMyConfig) {
+      if (
+        hasDriftRecursive(
+          ohMyConfig as Record<string, unknown>,
+          preset['oh-my-opencode']
+        )
+      ) {
+        return true
       }
     }
 
@@ -247,8 +388,8 @@ export class ModeManager {
    * Returns a formatted multi-line string showing:
    * - Current mode name and description
    * - Global model setting (if configured)
-   * - All OpenCode agents and their assigned models
-   * - All oh-my-opencode agents and their assigned models
+   * - Hierarchical tree of OpenCode configuration
+   * - Hierarchical tree of oh-my-opencode configuration
    *
    * @returns Promise resolving to formatted status string
    * @example
@@ -260,9 +401,10 @@ export class ModeManager {
    * // Description: High-performance models for complex tasks
    * // Global model: (not set)
    * //
-   * // OpenCode agents:
-   * //   - build: anthropic/claude-sonnet-4
-   * //   - plan: anthropic/claude-sonnet-4
+   * // OpenCode config:
+   * //   agent:
+   * //     build: anthropic/claude-sonnet-4
+   * //     plan: anthropic/claude-sonnet-4
    * // ...
    * ```
    */
@@ -279,24 +421,22 @@ export class ModeManager {
       ? `Global model: ${preset.model}`
       : 'Global model: (not set)'
 
-    const opencodeAgents = Object.entries(preset.opencode)
-      .map(([name, cfg]) => `  - ${name}: ${cfg.model}`)
-      .join('\n')
+    // opencode: recursively format tree
+    const opencodeTree = formatHierarchicalTree(preset.opencode)
 
-    const ohMyOpencodeAgents = Object.entries(preset['oh-my-opencode'])
-      .map(([name, cfg]) => `  - ${name}: ${cfg.model}`)
-      .join('\n')
+    // oh-my-opencode: recursively format tree
+    const ohMyOpencodeTree = formatHierarchicalTree(preset['oh-my-opencode'])
 
     return [
       `Current mode: ${currentMode}`,
       `Description: ${preset.description}`,
       globalModel,
       '',
-      'OpenCode agents:',
-      opencodeAgents || '  (none configured)',
+      'OpenCode config:',
+      opencodeTree || '  (none configured)',
       '',
-      'Oh-my-opencode agents:',
-      ohMyOpencodeAgents || '  (none configured)',
+      'Oh-my-opencode config:',
+      ohMyOpencodeTree || '  (none configured)',
     ].join('\n')
   }
 
@@ -391,16 +531,16 @@ export class ModeManager {
    *
    * This internal method modifies the OpenCode configuration file to apply
    * the new preset's settings. It preserves other configuration properties
-   * and only updates model-related fields.
+   * and only updates model-related fields using recursive merge.
    *
    * @param globalModel - Global model setting (optional). If provided, sets the top-level "model" field
-   * @param agentPresets - Agent-specific model settings. Keys are agent names, values contain model strings
+   * @param agentPresets - Hierarchical preset structure for agent configuration
    * @returns Promise resolving to result status: "updated", "skipped (not found)", or "error: ..."
    * @private
    */
   private async updateOpencodeConfig(
     globalModel: string | undefined,
-    agentPresets: Record<string, { model: string }>
+    agentPresets: HierarchicalPreset
   ): Promise<string> {
     try {
       const opencodeConfig = await loadOpencodeConfig()
@@ -414,14 +554,12 @@ export class ModeManager {
         opencodeConfig.model = globalModel
       }
 
-      // Update agent section (preserve other settings)
+      // Agent section: recursively merge preset into existing config
       opencodeConfig.agent = opencodeConfig.agent || {}
-      for (const [agentName, preset] of Object.entries(agentPresets)) {
-        opencodeConfig.agent[agentName] = {
-          ...opencodeConfig.agent[agentName],
-          model: preset.model,
-        }
-      }
+      deepMergeModel(
+        opencodeConfig.agent as Record<string, unknown>,
+        agentPresets
+      )
 
       await saveOpencodeConfig(opencodeConfig)
       return 'updated'
@@ -432,18 +570,19 @@ export class ModeManager {
   }
 
   /**
-   * Updates oh-my-opencode.json agents section with preset values.
+   * Updates oh-my-opencode.json with preset values.
    *
    * This internal method modifies the oh-my-opencode configuration file
-   * to apply the new preset's agent settings. Unlike opencode.json, this
-   * only updates the agents section and doesn't set a global model.
+   * to apply the new preset's settings using recursive merge. The entire
+   * structure (agents, categories, etc.) is updated while preserving
+   * other properties.
    *
-   * @param agentPresets - Agent-specific model settings. Keys are agent names, values contain model strings
+   * @param preset - Hierarchical preset structure for oh-my-opencode configuration
    * @returns Promise resolving to result status: "updated", "skipped (not found)", or "error: ..."
    * @private
    */
   private async updateOhMyOpencodeConfig(
-    agentPresets: Record<string, { model: string }>
+    preset: HierarchicalPreset
   ): Promise<string> {
     try {
       const ohMyConfig = await loadOhMyOpencodeConfig()
@@ -452,11 +591,8 @@ export class ModeManager {
         return 'skipped (not found)'
       }
 
-      // Update agents section only (preserve other settings)
-      ohMyConfig.agents = ohMyConfig.agents || {}
-      for (const [agentName, preset] of Object.entries(agentPresets)) {
-        ohMyConfig.agents[agentName] = { model: preset.model }
-      }
+      // Recursively merge preset into existing config
+      deepMergeModel(ohMyConfig as Record<string, unknown>, preset)
 
       await saveOhMyOpencodeConfig(ohMyConfig)
       return 'updated'

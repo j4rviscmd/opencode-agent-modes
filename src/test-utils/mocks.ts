@@ -118,6 +118,10 @@ export function createTestSetup() {
 
 /**
  * Sample configuration data for testing
+ *
+ * These samples reflect the actual hierarchical structure of opencode
+ * and oh-my-opencode configuration files, including nested sections
+ * like agents, categories, and custom properties.
  */
 export const sampleConfigs = {
   pluginConfig: {
@@ -128,11 +132,28 @@ export const sampleConfigs = {
         description: 'High-performance models for complex tasks',
         model: 'anthropic/claude-sonnet-4',
         opencode: {
-          build: { model: 'anthropic/claude-sonnet-4' },
+          build: { model: 'anthropic/claude-sonnet-4', piyo: 'fuga' },
           plan: { model: 'anthropic/claude-sonnet-4' },
         },
         'oh-my-opencode': {
-          coder: { model: 'anthropic/claude-sonnet-4' },
+          agents: {
+            sisyphus: {
+              model: 'github-copilot/claude-sonnet-4.5',
+              variant: 'high',
+            },
+            oracle: {
+              model: 'github-copilot/gpt-5.2',
+              variant: 'high',
+              piyo: 'fuga',
+            },
+          },
+          categories: {
+            'visual-engineering': {
+              model: 'github-copilot/gemini-3-pro',
+              variant: 'max',
+            },
+            quick: { model: 'github-copilot/claude-haiku-4.5' },
+          },
         },
       },
       economy: {
@@ -143,7 +164,14 @@ export const sampleConfigs = {
           plan: { model: 'opencode/glm-4.7-free' },
         },
         'oh-my-opencode': {
-          coder: { model: 'opencode/glm-4.7-free' },
+          agents: {
+            sisyphus: { model: 'opencode/glm-4.7-free' },
+            oracle: { model: 'opencode/glm-4.7-free' },
+          },
+          categories: {
+            'visual-engineering': { model: 'opencode/glm-4.7-free' },
+            quick: { model: 'opencode/glm-4.7-free' },
+          },
         },
       },
     },
@@ -151,15 +179,26 @@ export const sampleConfigs = {
   opencodeConfig: {
     model: 'anthropic/claude-sonnet-4',
     agent: {
-      build: { model: 'anthropic/claude-sonnet-4' },
+      build: { model: 'anthropic/claude-sonnet-4', mode: 'auto', piyo: 'fuga' },
       plan: { model: 'anthropic/claude-sonnet-4' },
       summary: { model: 'anthropic/claude-haiku' },
     },
   },
   ohMyOpencodeConfig: {
     agents: {
-      coder: { model: 'anthropic/claude-sonnet-4' },
-      reviewer: { model: 'anthropic/claude-haiku' },
+      sisyphus: {
+        model: 'github-copilot/claude-sonnet-4.5',
+        variant: 'high',
+        abc: 123,
+      },
+      oracle: { model: 'github-copilot/gpt-5.2', variant: 'high' },
+    },
+    categories: {
+      'visual-engineering': {
+        model: 'github-copilot/gemini-3-pro',
+        variant: 'max',
+      },
+      quick: { model: 'github-copilot/claude-haiku-4.5' },
     },
   },
 }

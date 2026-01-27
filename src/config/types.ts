@@ -1,18 +1,44 @@
 /**
- * Agent preset configuration for a single agent
+ * Generic model configuration for any agent.
+ *
+ * This interface is intentionally flexible to support arbitrary
+ * properties beyond just `model` and `variant`.
  */
-export interface AgentPreset {
-  model: string
+export interface ModelConfig {
+  model?: string
+  variant?: string
+  [key: string]: unknown
 }
 
 /**
- * Mode preset containing configurations for both opencode and oh-my-opencode agents
+ * Hierarchical preset structure supporting arbitrary nesting.
+ *
+ * This type recursively represents the configuration structure for
+ * both opencode and oh-my-opencode, supporting any level of nesting
+ * (e.g., agents/categories, future sections).
+ *
+ * Note: This type alias has a circular reference by design to support
+ * recursive structures. The TypeScript compiler warning about this
+ * can be safely ignored.
+ */
+// @ts-expect-error: Circular reference is intentional for recursive structure
+export type HierarchicalPreset = Record<
+  string,
+  ModelConfig | HierarchicalPreset
+>
+
+/**
+ * Mode preset containing configurations for both opencode and oh-my-opencode agents.
+ *
+ * Both opencode and oh-my-opencode use the same HierarchicalPreset type,
+ * allowing them to have arbitrary nested structures that are handled
+ * uniformly by recursive merge functions.
  */
 export interface ModePreset {
   description: string
   model?: string
-  opencode: Record<string, AgentPreset>
-  'oh-my-opencode': Record<string, AgentPreset>
+  opencode: HierarchicalPreset
+  'oh-my-opencode': HierarchicalPreset
 }
 
 /**
@@ -26,6 +52,9 @@ export interface ModeSwitcherConfig {
 
 /**
  * OpenCode agent configuration structure in opencode.json
+ *
+ * @deprecated This type is kept for backward compatibility but may not
+ * accurately represent the actual structure. Use ModelConfig directly.
  */
 export interface OpencodeAgentConfig {
   model?: string
@@ -35,18 +64,22 @@ export interface OpencodeAgentConfig {
 
 /**
  * OpenCode configuration file structure
+ *
+ * Supports arbitrary properties beyond the documented ones.
  */
 export interface OpencodeConfig {
   model?: string
-  agent?: Record<string, OpencodeAgentConfig>
+  agent?: HierarchicalPreset
   [key: string]: unknown
 }
 
 /**
  * Oh-my-opencode configuration file structure
+ *
+ * Supports arbitrary properties and nested structures like
+ * agents, categories, and any future sections.
  */
 export interface OhMyOpencodeConfig {
-  agents?: Record<string, AgentPreset>
   [key: string]: unknown
 }
 
