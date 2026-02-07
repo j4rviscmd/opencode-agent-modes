@@ -17,6 +17,12 @@ OpenCode plugin to switch agent models between performance and economy modes.
   <img src="assets/image/sample.png" width="700" alt="Change mode example" />
 </p>
 
+## Star this repo to keep me motivated ⭐
+
+I build this in my spare time. Every star shows that my work is valued and keeps me going!
+
+![Star](docs/images/star-github.gif)
+
 ## Features
 
 - Switch between different model presets (performance, economy, or custom)
