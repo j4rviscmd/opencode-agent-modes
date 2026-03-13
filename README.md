@@ -41,7 +41,7 @@ Add the plugin to your `opencode.json`:
 ```
 
 The following command files are automatically copied to
-`~/.config/opencode/command/` when the plugin initializes:
+`~/.config/opencode/commands/` when the plugin initializes:
 
 - `mode-performance.md`
 - `mode-economy.md`
@@ -135,7 +135,7 @@ To add a custom preset (e.g., "premium"):
    }
    ```
 
-2. Create a command file at `~/.config/opencode/command/mode-premium.md`:
+2. Create a command file at `~/.config/opencode/commands/mode-premium.md`:
 
    ```md
    ---

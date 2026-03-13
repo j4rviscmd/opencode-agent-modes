@@ -41,7 +41,7 @@ const modeSwitcherPlugin: Plugin = async ({ client }) => {
   // Initialize on startup with error handling
   try {
     await modeManager.initialize()
-    // Copy slash command files to ~/.config/opencode/command/
+    // Copy slash command files to ~/.config/opencode/commands/
     copyCommandFiles()
   } catch (error) {
     // Log error but don't block opencode startup

@@ -18,11 +18,11 @@ import { fileURLToPath } from 'node:url'
  * Target directory for OpenCode command files.
  *
  * This is the standard location where OpenCode looks for slash command
- * markdown files: `~/.config/opencode/command/`
+ * markdown files: `~/.config/opencode/commands/`
  *
  * @constant
  */
-const COMMANDS_DEST = join(homedir(), '.config', 'opencode', 'command')
+const COMMANDS_DEST = join(homedir(), '.config', 'opencode', 'commands')
 
 /**
  * Finds the commands source directory.
