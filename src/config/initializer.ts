@@ -60,6 +60,10 @@ function applyEconomyModel(
  * files and preserves their entire structure as-is. The hierarchical
  * structure (agent, agents, categories, etc.) is maintained exactly.
  *
+ * If `oh-my-opencode.json` does not exist (i.e., the user does not use the
+ * oh-my-opencode plugin), the `'oh-my-opencode'` key is omitted from the
+ * returned preset entirely.
+ *
  * @returns Promise resolving to a ModePreset with performance-oriented models
  * @example
  * ```typescript
@@ -86,7 +90,7 @@ async function buildPerformancePreset(): Promise<ModePreset> {
     description: 'High-performance models for complex tasks',
     ...(globalModel && { model: globalModel }),
     opencode: opencodePreset,
-    'oh-my-opencode': ohMyOpencodePreset,
+    ...(ohMyOpencodeConfig && { 'oh-my-opencode': ohMyOpencodePreset }),
   }
 }
 
@@ -97,6 +101,10 @@ async function buildPerformancePreset(): Promise<ModePreset> {
  * (both OpenCode and oh-my-opencode) are configured to use the
  * `opencode/glm-4.7-free` model. The hierarchical structure is
  * preserved while model values are updated recursively.
+ *
+ * If `oh-my-opencode.json` does not exist (i.e., the user does not use the
+ * oh-my-opencode plugin), the `'oh-my-opencode'` key is omitted from the
+ * returned preset entirely.
  *
  * @returns Promise resolving to a ModePreset with economy-oriented models
  * @example
@@ -125,7 +133,7 @@ async function buildEconomyPreset(): Promise<ModePreset> {
     description: 'Cost-efficient free model for routine tasks',
     model: DEFAULT_ECONOMY_MODEL,
     opencode: opencodePreset,
-    'oh-my-opencode': ohMyOpencodePreset,
+    ...(ohMyOpencodeConfig && { 'oh-my-opencode': ohMyOpencodePreset }),
   }
 }
 

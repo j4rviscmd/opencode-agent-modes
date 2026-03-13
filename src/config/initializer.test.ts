@@ -236,4 +236,58 @@ describe('initializer', () => {
       expect(validateConfig(loadedConfig)).toBe(true)
     })
   })
+
+  describe('oh-my-opencode optional preset', () => {
+    test('validateConfig returns true for preset without oh-my-opencode key', () => {
+      const config: ModeSwitcherConfig = {
+        currentMode: 'performance',
+        showToastOnStartup: true,
+        presets: {
+          performance: {
+            description: 'High-performance models for complex tasks',
+            model: 'anthropic/claude-sonnet-4',
+            opencode: {
+              build: { model: 'anthropic/claude-sonnet-4' },
+            },
+            // Note: no 'oh-my-opencode' key
+          },
+        },
+      }
+      expect(validateConfig(config)).toBe(true)
+    })
+
+    test('validateConfig returns true for config where some presets have oh-my-opencode and some do not', () => {
+      const config: ModeSwitcherConfig = {
+        currentMode: 'performance',
+        showToastOnStartup: true,
+        presets: {
+          performance: {
+            description: 'With oh-my-opencode',
+            opencode: {},
+            'oh-my-opencode': { agents: {} },
+          },
+          economy: {
+            description: 'Without oh-my-opencode',
+            opencode: {},
+            // Note: no 'oh-my-opencode' key
+          },
+        },
+      }
+      expect(validateConfig(config)).toBe(true)
+    })
+
+    test('preset without oh-my-opencode key has undefined value for that field', () => {
+      const preset: ModePreset = {
+        description: 'No oh-my-opencode',
+        model: 'anthropic/claude-sonnet-4',
+        opencode: {
+          build: { model: 'anthropic/claude-sonnet-4' },
+        },
+        // Note: no 'oh-my-opencode' key
+      }
+
+      // Accessing undefined key should return undefined (not throw)
+      expect(preset['oh-my-opencode']).toBeUndefined()
+    })
+  })
 })
