@@ -86,7 +86,7 @@ async function buildPerformancePreset(): Promise<ModePreset> {
     description: 'High-performance models for complex tasks',
     ...(globalModel && { model: globalModel }),
     opencode: opencodePreset,
-    'oh-my-opencode': ohMyOpencodePreset,
+    ...(ohMyOpencodeConfig && { 'oh-my-opencode': ohMyOpencodePreset }),
   }
 }
 
@@ -125,7 +125,7 @@ async function buildEconomyPreset(): Promise<ModePreset> {
     description: 'Cost-efficient free model for routine tasks',
     model: DEFAULT_ECONOMY_MODEL,
     opencode: opencodePreset,
-    'oh-my-opencode': ohMyOpencodePreset,
+    ...(ohMyOpencodeConfig && { 'oh-my-opencode': ohMyOpencodePreset }),
   }
 }
 

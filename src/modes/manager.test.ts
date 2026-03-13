@@ -95,7 +95,7 @@ class MockModeManager {
       )
     }
 
-    if (this.ohMyConfig) {
+    if (this.ohMyConfig && preset['oh-my-opencode']) {
       deepMergeModel(
         this.ohMyConfig as Record<string, unknown>,
         preset['oh-my-opencode']
@@ -130,6 +130,7 @@ class MockModeManager {
     // Check oh-my-opencode: recursively
     if (
       this.ohMyConfig &&
+      preset['oh-my-opencode'] &&
       hasDriftRecursive(
         this.ohMyConfig as Record<string, unknown>,
         preset['oh-my-opencode']
@@ -188,7 +189,9 @@ class MockModeManager {
       : 'Global model: (not set)'
 
     const opencodeTree = formatHierarchicalTree(preset.opencode)
-    const ohMyOpencodeTree = formatHierarchicalTree(preset['oh-my-opencode'])
+    const ohMyOpencodeTree = preset['oh-my-opencode']
+      ? formatHierarchicalTree(preset['oh-my-opencode'])
+      : ''
 
     return [
       `Current mode: ${currentMode}`,
@@ -222,7 +225,9 @@ class MockModeManager {
     }
 
     // Simulate updating oh-my-opencode.json
-    if (this.ohMyConfig) {
+    if (!preset['oh-my-opencode']) {
+      results.push('oh-my-opencode.json: skipped (not configured)')
+    } else if (this.ohMyConfig) {
       results.push('oh-my-opencode.json: updated')
     } else {
       results.push('oh-my-opencode.json: skipped (not found)')
@@ -655,6 +660,105 @@ describe('ModeManager', () => {
 
       // Should detect drift and apply preset
       expect(manager.lastDriftToast).not.toBeNull()
+    })
+  })
+
+  describe('oh-my-opencode optional (no oh-my-opencode key in preset)', () => {
+    /**
+     * A config without 'oh-my-opencode' key in the preset, simulating
+     * a user who does not use oh-my-opencode.
+     */
+    function cloneConfigWithoutOhMy(): ModeSwitcherConfig {
+      return {
+        currentMode: 'performance',
+        showToastOnStartup: true,
+        presets: {
+          performance: {
+            description: 'High-performance models for complex tasks',
+            model: 'anthropic/claude-sonnet-4',
+            opencode: {
+              build: { model: 'anthropic/claude-sonnet-4' },
+              plan: { model: 'anthropic/claude-sonnet-4' },
+            },
+            // Note: no 'oh-my-opencode' key
+          },
+          economy: {
+            description: 'Cost-efficient free model for routine tasks',
+            model: 'opencode/glm-4.7-free',
+            opencode: {
+              build: { model: 'opencode/glm-4.7-free' },
+              plan: { model: 'opencode/glm-4.7-free' },
+            },
+            // Note: no 'oh-my-opencode' key
+          },
+        },
+      }
+    }
+
+    test('switchMode returns "skipped (not configured)" for oh-my-opencode when preset has no oh-my-opencode key', async () => {
+      manager.setConfig(cloneConfigWithoutOhMy())
+      manager.setOpencodeConfig(sampleConfigs.opencodeConfig)
+      manager.setOhMyConfig(sampleConfigs.ohMyOpencodeConfig)
+      await manager.initialize()
+
+      const result = await manager.switchMode('economy')
+      expect(result).toContain('oh-my-opencode.json: skipped (not configured)')
+    })
+
+    test('getStatus does not crash when preset has no oh-my-opencode key', async () => {
+      manager.setConfig(cloneConfigWithoutOhMy())
+      await manager.initialize()
+
+      const status = await manager.getStatus()
+      expect(status).toContain('Current mode: performance')
+      expect(status).toContain('Oh-my-opencode config:')
+      expect(status).toContain('(none configured)')
+    })
+
+    test('initialize does not crash on drift check when preset has no oh-my-opencode key', async () => {
+      const config = cloneConfigWithoutOhMy()
+      config.currentMode = 'economy'
+      manager.setConfig(config)
+      // opencode drifted, oh-my-opencode present in FS but preset has no oh-my-opencode key
+      manager.setOpencodeConfig({
+        model: 'anthropic/claude-sonnet-4', // mismatch with economy
+        agent: {
+          build: { model: 'anthropic/claude-sonnet-4' },
+          plan: { model: 'anthropic/claude-sonnet-4' },
+        },
+      })
+      manager.setOhMyConfig(sampleConfigs.ohMyOpencodeConfig)
+
+      // Should not throw
+      await manager.initialize()
+
+      // Drift detected via opencode config, so toast should be set
+      expect(manager.lastDriftToast).not.toBeNull()
+      expect(manager.lastDriftToast).toContain('economy')
+    })
+
+    test('initialize does not apply oh-my-opencode changes when preset has no oh-my-opencode key', async () => {
+      const config = cloneConfigWithoutOhMy()
+      config.currentMode = 'economy'
+      manager.setConfig(config)
+      manager.setOpencodeConfig({
+        model: 'opencode/glm-4.7-free', // already matching
+        agent: {
+          build: { model: 'opencode/glm-4.7-free' },
+          plan: { model: 'opencode/glm-4.7-free' },
+        },
+      })
+      manager.setOhMyConfig({
+        agents: {
+          sisyphus: { model: 'anthropic/claude-sonnet-4' }, // different model
+        },
+      })
+
+      await manager.initialize()
+
+      // No drift (opencode matches), so toast should not be set
+      // and oh-my-opencode should NOT be modified (preset has no oh-my-opencode)
+      expect(manager.lastDriftToast).toBeNull()
     })
   })
 })

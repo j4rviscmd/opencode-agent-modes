@@ -259,7 +259,9 @@ export class ModeManager {
 
     // Apply the preset to actual config files
     await this.updateOpencodeConfig(preset.model, preset.opencode)
-    await this.updateOhMyOpencodeConfig(preset['oh-my-opencode'])
+    if (preset['oh-my-opencode']) {
+      await this.updateOhMyOpencodeConfig(preset['oh-my-opencode'])
+    }
 
     // Notify user to restart (fire-and-forget to avoid blocking
     // plugin initialization when UI is not yet ready).
@@ -317,9 +319,10 @@ export class ModeManager {
       return true
     }
 
-    // Check oh-my-opencode: recursively check
+    // Check oh-my-opencode: recursively check (skip if preset has no oh-my-opencode config)
     if (
       ohMyConfig &&
+      preset['oh-my-opencode'] &&
       hasDriftRecursive(
         ohMyConfig as Record<string, unknown>,
         preset['oh-my-opencode']
@@ -437,8 +440,10 @@ export class ModeManager {
     // opencode: recursively format tree
     const opencodeTree = formatHierarchicalTree(preset.opencode)
 
-    // oh-my-opencode: recursively format tree
-    const ohMyOpencodeTree = formatHierarchicalTree(preset['oh-my-opencode'])
+    // oh-my-opencode: recursively format tree (skip if not configured)
+    const ohMyOpencodeTree = preset['oh-my-opencode']
+      ? formatHierarchicalTree(preset['oh-my-opencode'])
+      : ''
 
     return [
       `Current mode: ${currentMode}`,
@@ -502,10 +507,10 @@ export class ModeManager {
     )
     results.push(`opencode.json: ${opencodeResult}`)
 
-    // 2. Update oh-my-opencode.json directly (agents section only)
-    const ohMyResult = await this.updateOhMyOpencodeConfig(
-      preset['oh-my-opencode']
-    )
+    // 2. Update oh-my-opencode.json directly (agents section only, skip if not configured)
+    const ohMyResult = preset['oh-my-opencode']
+      ? await this.updateOhMyOpencodeConfig(preset['oh-my-opencode'])
+      : 'skipped (not configured)'
     results.push(`oh-my-opencode.json: ${ohMyResult}`)
 
     // 3. Update plugin configuration

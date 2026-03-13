@@ -33,12 +33,15 @@ export type HierarchicalPreset = Record<
  * Both opencode and oh-my-opencode use the same HierarchicalPreset type,
  * allowing them to have arbitrary nested structures that are handled
  * uniformly by recursive merge functions.
+ *
+ * The `oh-my-opencode` field is optional to support users who do not use the
+ * oh-my-opencode plugin. When absent, all oh-my-opencode related processing is skipped.
  */
 export interface ModePreset {
   description: string
   model?: string
   opencode: HierarchicalPreset
-  'oh-my-opencode': HierarchicalPreset
+  'oh-my-opencode'?: HierarchicalPreset
 }
 
 /**
