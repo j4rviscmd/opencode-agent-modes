@@ -290,6 +290,10 @@ export class ModeManager {
    * Checks global model and per-agent model values recursively. Returns true
    * if any expected value differs from the actual file content.
    *
+   * If the preset does not include an `'oh-my-opencode'` key (i.e., the user
+   * does not use the oh-my-opencode plugin), drift checking for that config
+   * file is skipped entirely.
+   *
    * @param preset - The mode preset to compare against
    * @returns True if actual configs differ from the preset
    * @private
@@ -464,7 +468,7 @@ export class ModeManager {
    * This method performs the following operations:
    * 1. Validates that the requested mode exists
    * 2. Updates `opencode.json` with new global model and agent settings
-   * 3. Updates `oh-my-opencode.json` with new agent settings
+   * 3. Updates `oh-my-opencode.json` with new agent settings (skipped if preset has no `'oh-my-opencode'` key)
    * 4. Updates `agent-mode-switcher.json` with the new current mode
    * 5. Shows a toast notification (if available)
    *
@@ -475,6 +479,7 @@ export class ModeManager {
    * @returns Promise resolving to a formatted result message with status of each config update
    * @example
    * ```typescript
+   * // With oh-my-opencode configured:
    * const result = await manager.switchMode('economy');
    * console.log(result);
    * // Output:
@@ -484,6 +489,18 @@ export class ModeManager {
    * // Results:
    * //   - opencode.json: updated
    * //   - oh-my-opencode.json: updated
+   * //   - agent-mode-switcher.json: updated
+   * //
+   * // Note: Restart opencode to apply changes.
+   *
+   * // Without oh-my-opencode configured:
+   * // Output:
+   * // Switched to economy mode
+   * // Cost-efficient free model for routine tasks
+   * //
+   * // Results:
+   * //   - opencode.json: updated
+   * //   - oh-my-opencode.json: skipped (not configured)
    * //   - agent-mode-switcher.json: updated
    * //
    * // Note: Restart opencode to apply changes.
