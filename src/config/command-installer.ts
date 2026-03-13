@@ -18,35 +18,21 @@ import { fileURLToPath } from 'node:url'
  * Target directory for OpenCode command files.
  *
  * This is the standard location where OpenCode looks for slash command
- * markdown files: `~/.config/opencode/command/`
+ * markdown files: `~/.config/opencode/commands/`
  *
  * @constant
  */
-const COMMANDS_DEST = join(homedir(), '.config', 'opencode', 'command')
+const COMMANDS_DEST = join(homedir(), '.config', 'opencode', 'commands')
 
 /**
  * Finds the commands source directory.
  *
  * Tries multiple candidate paths to support both production and development
- * environments by checking relative paths from the current module location:
- * - Production: bundled dist/index.js -> ../commands
+ * environments:
+ * - Production: dist/index.js -> ../commands
  * - Development: src/config/command-installer.ts -> ../../commands
  *
- * The function checks each candidate path in order and returns the first
- * one that exists on the filesystem.
- *
- * @returns Absolute path to commands directory if found, or null if none
- *          of the candidate paths exist
- *
- * @example
- * ```typescript
- * const commandsDir = findCommandsDir();
- * if (commandsDir) {
- *   console.log(`Commands found at: ${commandsDir}`);
- * } else {
- *   console.log('Commands directory not found');
- * }
- * ```
+ * @returns Absolute path to commands directory if found, or null if not found
  */
 function findCommandsDir(): string | null {
   const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -63,25 +49,10 @@ function findCommandsDir(): string | null {
 /**
  * Copies slash command markdown files to OpenCode's command directory.
  *
- * This function is called during plugin initialization to ensure
- * command files are available without manual postinstall execution.
- * It creates the destination directory if it doesn't exist and copies
- * all `.md` files from the source commands directory.
+ * Creates the destination directory if needed and copies all `.md` files.
+ * Non-fatal: logs warnings on failure without blocking plugin initialization.
  *
- * The function is designed to be non-fatal: if copying fails (e.g., due to
- * permission issues), it logs a warning but doesn't throw an error,
- * allowing the plugin to continue initializing.
- *
- * @returns Number of files successfully copied, or -1 if source directory
- *          not found or an error occurred during copying
- *
- * @example
- * ```typescript
- * const copied = copyCommandFiles();
- * if (copied > 0) {
- *   console.log(`Copied ${copied} command files`);
- * }
- * ```
+ * @returns Number of files copied, or -1 if source not found or error occurred
  */
 export function copyCommandFiles(): number {
   const commandsSrc = findCommandsDir()

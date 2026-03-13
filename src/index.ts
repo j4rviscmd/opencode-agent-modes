@@ -41,7 +41,7 @@ const modeSwitcherPlugin: Plugin = async ({ client }) => {
   // Initialize on startup with error handling
   try {
     await modeManager.initialize()
-    // Copy slash command files to ~/.config/opencode/command/
+    // Copy slash command files to ~/.config/opencode/commands/
     copyCommandFiles()
   } catch (error) {
     // Log error but don't block opencode startup
@@ -53,16 +53,6 @@ const modeSwitcherPlugin: Plugin = async ({ client }) => {
 
   return {
     tool: {
-      /**
-       * Switch to a different agent mode preset.
-       *
-       * Updates the active mode configuration and applies it to both
-       * opencode.json and oh-my-opencode.json files. The mode preset
-       * determines which AI models are assigned to each agent type.
-       *
-       * @param args.mode - Name of the mode preset to switch to (e.g., "performance", "economy")
-       * @returns Success or error message with details about the mode switch operation
-       */
       mode_switch: tool({
         description: 'Switch agent mode to a specified preset',
         args: {
@@ -75,14 +65,6 @@ const modeSwitcherPlugin: Plugin = async ({ client }) => {
         },
       }),
 
-      /**
-       * Display current agent mode and its configuration.
-       *
-       * Shows the currently active mode preset and the AI model assignments
-       * for all agent types in both OpenCode and Oh My OpenCode configurations.
-       *
-       * @returns Current mode name and detailed configuration information
-       */
       mode_status: tool({
         description: 'Show current agent mode and its configuration',
         args: {},
@@ -91,15 +73,6 @@ const modeSwitcherPlugin: Plugin = async ({ client }) => {
         },
       }),
 
-      /**
-       * List all available mode presets.
-       *
-       * Returns a list of all configured mode presets with their names
-       * and AI model assignments for each agent type. This helps users
-       * understand what modes are available for switching.
-       *
-       * @returns Array of mode preset names and their configurations
-       */
       mode_list: tool({
         description: 'List all available mode presets',
         args: {},
