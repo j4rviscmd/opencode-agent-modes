@@ -41,6 +41,9 @@ class MockModeManager {
   /** Tracks whether a drift-toast was shown during initialize */
   lastDriftToast: string | null = null
 
+  /** Tracks whether a no-drift info toast was shown during initialize */
+  lastInfoToast: string | null = null
+
   constructor(client: OpencodeClient) {
     this.client = client
   }
@@ -79,30 +82,35 @@ class MockModeManager {
     }
 
     const drifted = this.hasConfigDrift(preset)
-    if (!drifted) {
+
+    if (drifted) {
+      // Apply preset to in-memory configs using recursive merge
+      if (this.opencodeConfig) {
+        if (preset.model) {
+          this.opencodeConfig.model = preset.model
+        }
+        this.opencodeConfig.agent = this.opencodeConfig.agent || {}
+        deepMergeModel(
+          this.opencodeConfig.agent as Record<string, unknown>,
+          preset.opencode
+        )
+      }
+
+      if (this.ohMyConfig && preset['oh-my-opencode']) {
+        deepMergeModel(
+          this.ohMyConfig as Record<string, unknown>,
+          preset['oh-my-opencode']
+        )
+      }
+
+      this.lastDriftToast = `applied "${this.config.currentMode}" mode.\nrestart opencode to take effect.`
       return
     }
 
-    // Apply preset to in-memory configs using recursive merge
-    if (this.opencodeConfig) {
-      if (preset.model) {
-        this.opencodeConfig.model = preset.model
-      }
-      this.opencodeConfig.agent = this.opencodeConfig.agent || {}
-      deepMergeModel(
-        this.opencodeConfig.agent as Record<string, unknown>,
-        preset.opencode
-      )
+    // No drift: show informational toast if configured
+    if (this.config.showToastOnStartup) {
+      this.lastInfoToast = `current mode: ${this.config.currentMode}`
     }
-
-    if (this.ohMyConfig && preset['oh-my-opencode']) {
-      deepMergeModel(
-        this.ohMyConfig as Record<string, unknown>,
-        preset['oh-my-opencode']
-      )
-    }
-
-    this.lastDriftToast = `Applied "${this.config.currentMode}" mode. Restart opencode to take effect.`
   }
 
   private hasConfigDrift(preset: ModePreset): boolean {
@@ -495,7 +503,7 @@ describe('ModeManager', () => {
       await manager.initialize()
 
       expect(manager.lastDriftToast).toContain('economy')
-      expect(manager.lastDriftToast).toContain('Restart opencode')
+      expect(manager.lastDriftToast).toContain('restart opencode')
     })
 
     test('applies preset when oh-my-opencode.json has drifted', async () => {
@@ -544,6 +552,88 @@ describe('ModeManager', () => {
       await manager.initialize()
 
       expect(manager.lastDriftToast).toBeNull()
+    })
+
+    test('shows info toast when no drift and showToastOnStartup is true', async () => {
+      const config = clonePluginConfig()
+      config.currentMode = 'economy'
+      config.showToastOnStartup = true
+      manager.setConfig(config)
+
+      manager.setOpencodeConfig({
+        model: 'opencode/glm-4.7-free',
+        agent: {
+          build: { model: 'opencode/glm-4.7-free' },
+          plan: { model: 'opencode/glm-4.7-free' },
+        },
+      })
+
+      manager.setOhMyConfig({
+        agents: {
+          sisyphus: { model: 'opencode/glm-4.7-free' },
+          oracle: { model: 'opencode/glm-4.7-free' },
+        },
+        categories: {
+          'visual-engineering': { model: 'opencode/glm-4.7-free' },
+          quick: { model: 'opencode/glm-4.7-free' },
+        },
+      })
+
+      await manager.initialize()
+
+      expect(manager.lastDriftToast).toBeNull()
+      expect(manager.lastInfoToast).toBe('current mode: economy')
+    })
+
+    test('does not show info toast when no drift and showToastOnStartup is false', async () => {
+      const config = clonePluginConfig()
+      config.currentMode = 'economy'
+      config.showToastOnStartup = false
+      manager.setConfig(config)
+
+      manager.setOpencodeConfig({
+        model: 'opencode/glm-4.7-free',
+        agent: {
+          build: { model: 'opencode/glm-4.7-free' },
+          plan: { model: 'opencode/glm-4.7-free' },
+        },
+      })
+
+      manager.setOhMyConfig({
+        agents: {
+          sisyphus: { model: 'opencode/glm-4.7-free' },
+          oracle: { model: 'opencode/glm-4.7-free' },
+        },
+        categories: {
+          'visual-engineering': { model: 'opencode/glm-4.7-free' },
+          quick: { model: 'opencode/glm-4.7-free' },
+        },
+      })
+
+      await manager.initialize()
+
+      expect(manager.lastDriftToast).toBeNull()
+      expect(manager.lastInfoToast).toBeNull()
+    })
+
+    test('does not show info toast when drift is detected (only drift toast)', async () => {
+      const config = clonePluginConfig()
+      config.currentMode = 'economy'
+      config.showToastOnStartup = true
+      manager.setConfig(config)
+
+      manager.setOpencodeConfig({
+        model: 'anthropic/claude-sonnet-4', // Mismatch: drift
+        agent: {
+          build: { model: 'anthropic/claude-sonnet-4' },
+          plan: { model: 'anthropic/claude-sonnet-4' },
+        },
+      })
+
+      await manager.initialize()
+
+      expect(manager.lastDriftToast).not.toBeNull()
+      expect(manager.lastInfoToast).toBeNull()
     })
 
     test('does nothing when preset is not found', async () => {

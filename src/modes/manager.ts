@@ -240,6 +240,12 @@ export class ModeManager {
    * files are updated to match the expected preset values,
    * and a toast notification prompts the user to restart.
    *
+   * When no drift is detected and `showToastOnStartup` is enabled,
+   * an informational toast displays the current mode name.
+   *
+   * Toast notifications are delayed via `setTimeout` to allow the
+   * OpenCode UI to fully initialize before sending them.
+   *
    * @private
    */
   private async applyCurrentModeIfNeeded(): Promise<void> {
@@ -253,34 +259,53 @@ export class ModeManager {
     }
 
     const drifted = await this.hasConfigDrift(preset)
-    if (!drifted) {
+
+    if (drifted) {
+      // Apply the preset to actual config files
+      await this.updateOpencodeConfig(preset.model, preset.opencode)
+      if (preset['oh-my-opencode']) {
+        await this.updateOhMyOpencodeConfig(preset['oh-my-opencode'])
+      }
+
+      // Delay toast to allow UI to initialize before displaying.
+      // This is always shown regardless of showToastOnStartup since
+      // config drift is an important warning the user needs to see.
+      const modeName = this.config.currentMode
+      setTimeout(() => {
+        this.client.tui
+          .showToast({
+            body: {
+              title: 'agent-mode-switcher',
+              message: `applied "${modeName}" mode.\nrestart opencode to take effect.`,
+              variant: 'warning',
+              duration: 5000,
+            },
+          })
+          .catch(() => {
+            // Toast might not be available if UI failed to initialize
+          })
+      }, 3000)
       return
     }
 
-    // Apply the preset to actual config files
-    await this.updateOpencodeConfig(preset.model, preset.opencode)
-    if (preset['oh-my-opencode']) {
-      await this.updateOhMyOpencodeConfig(preset['oh-my-opencode'])
+    // No drift: show informational toast if configured
+    if (this.config.showToastOnStartup) {
+      const modeName = this.config.currentMode
+      setTimeout(() => {
+        this.client.tui
+          .showToast({
+            body: {
+              title: 'agent-mode-switcher',
+              message: `current mode: ${modeName}`,
+              variant: 'info',
+              duration: 3000,
+            },
+          })
+          .catch(() => {
+            // Toast might not be available if UI failed to initialize
+          })
+      }, 3000)
     }
-
-    // Notify user to restart (fire-and-forget to avoid blocking
-    // plugin initialization when UI is not yet ready).
-    // TODO: Currently toast is likely not displayed because UI is
-    // not initialized at this point. To reliably show the toast,
-    // use setTimeout for delayed execution or an onReady lifecycle
-    // hook if OpenCode adds one in the future.
-    this.client.tui
-      .showToast({
-        body: {
-          title: 'Mode Applied',
-          message: `Applied "${this.config.currentMode}" mode. Restart opencode to take effect.`,
-          variant: 'warning',
-          duration: 5000,
-        },
-      })
-      .catch(() => {
-        // Toast might not be available during early initialization
-      })
   }
 
   /**
