@@ -48,20 +48,42 @@ The following command files are automatically copied to
 - `mode-status.md`
 - `mode-list.md`
 
-## Usage
+## How to Change Mode
 
-### Available Commands
+### Recommended: Edit Configuration File Directly
+
+The recommended way to switch modes is to edit
+`~/.config/opencode/agent-mode-switcher.json` and change the `currentMode` value:
+
+```json
+{
+  "currentMode": "economy"
+}
+```
+
+Then start (or restart) opencode. The plugin automatically detects the change
+and applies the corresponding preset to `opencode.json` and
+`oh-my-opencode.json`.
+
+Available values for `currentMode`:
+
+- `"performance"` - High-performance models for complex tasks
+- `"economy"` - Cost-efficient free model for routine tasks
+- Any custom preset name you have defined
+
+> [!TIP]
+> This approach is preferred because it works even when opencode is not
+> running. The plugin applies pending changes on the next startup.
+
+### Alternative: Slash Commands
 
 - `/mode-performance` - Switch to high-performance models
 - `/mode-economy` - Switch to cost-efficient free models
+
+## Slash Commands
+
 - `/mode-status` - Show current mode and configuration
 - `/mode-list` - List all available mode presets
-
-### Available Tools
-
-- `mode_switch` - Switch to a specified mode preset
-- `mode_status` - Display current mode settings
-- `mode_list` - List all available presets
 
 ## Configuration
 
